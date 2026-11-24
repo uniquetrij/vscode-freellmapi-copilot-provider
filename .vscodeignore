@@ -1,0 +1,21 @@
+**/*.ts
+.vscode/**
+.git/**
+.gitignore
+src/**
+scripts/**
+AGENTS.md
+eslint.config.mjs
+tsconfig.json
+package-lock.json
+*.vsix
+ws/**
+# Only compiled JavaScript and the build stamp ship; the rest of build/ holds
+# local artifacts (build counter, VSIX files, scratch notes). The re-includes
+# are explicit because a negated directory glob would also pull the source maps
+# back in, defeating **/*.map below.
+build/**
+!build/out/*.js
+!build/out/buildInfo.json
+node_modules/.bin/**
+**/*.map

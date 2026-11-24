@@ -1,0 +1,257 @@
+{
+  "name": "freellmapi-chat-provider",
+  "publisher": "uniquetrij",
+  "displayName": "FreeLLMAPI",
+  "description": "Brings FreeLLMAPI's OpenAI-compatible free-model router into VS Code's native Chat model picker.",
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uniquetrij/vscode-freellmapi-copilot-provider.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.104.0"
+  },
+  "enabledApiProposals": [
+    "chatProvider",
+    "languageModelThinkingPart"
+  ],
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "keywords": [
+    "ai",
+    "agent",
+    "assistant",
+    "chat provider",
+    "freellmapi",
+    "openai-compatible",
+    "router",
+    "free"
+  ],
+  "icon": "assets/icon.png",
+  "main": "./build/out/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onLanguageModelChatProvider:freellmapi",
+    "onCommand:freellmapi.setApiKey",
+    "onCommand:freellmapi.clearApiKey",
+    "onCommand:freellmapi.setBaseUrl",
+    "onCommand:freellmapi.refreshModels",
+    "onCommand:freellmapi.checkConnection",
+    "onCommand:freellmapi.selfTest",
+    "onCommand:freellmapi.showUsage",
+    "onCommand:freellmapi.startServer",
+    "onCommand:freellmapi.stopServer",
+    "onCommand:freellmapi.restartServer",
+    "onCommand:freellmapi.showStatus",
+    "onCommand:freellmapi.showLogs",
+    "onCommand:freellmapi.showServerLogs",
+    "onCommand:freellmapi.openDashboard"
+  ],
+  "contributes": {
+    "languageModelChatProviders": [
+      {
+        "vendor": "freellmapi",
+        "displayName": "FreeLLMAPI"
+      }
+    ],
+    "commands": [
+      {
+        "command": "freellmapi.setApiKey",
+        "title": "FreeLLMAPI: Set API Key"
+      },
+      {
+        "command": "freellmapi.clearApiKey",
+        "title": "FreeLLMAPI: Clear API Key"
+      },
+      {
+        "command": "freellmapi.setBaseUrl",
+        "title": "FreeLLMAPI: Set Base URL"
+      },
+      {
+        "command": "freellmapi.refreshModels",
+        "title": "FreeLLMAPI: Refresh Model List"
+      },
+      {
+        "command": "freellmapi.checkConnection",
+        "title": "FreeLLMAPI: Check Connection"
+      },
+      {
+        "command": "freellmapi.selfTest",
+        "title": "FreeLLMAPI: Self Test"
+      },
+      {
+        "command": "freellmapi.showUsage",
+        "title": "FreeLLMAPI: Show Usage"
+      },
+      {
+        "command": "freellmapi.startServer",
+        "title": "FreeLLMAPI: Start Server"
+      },
+      {
+        "command": "freellmapi.stopServer",
+        "title": "FreeLLMAPI: Stop Server"
+      },
+      {
+        "command": "freellmapi.restartServer",
+        "title": "FreeLLMAPI: Restart Server"
+      },
+      {
+        "command": "freellmapi.showStatus",
+        "title": "FreeLLMAPI: Show Status"
+      },
+      {
+        "command": "freellmapi.showLogs",
+        "title": "FreeLLMAPI: Show Logs"
+      },
+      {
+        "command": "freellmapi.showServerLogs",
+        "title": "FreeLLMAPI: Show Server Logs"
+      },
+      {
+        "command": "freellmapi.openDashboard",
+        "title": "FreeLLMAPI: Open Dashboard"
+      }
+    ],
+    "configuration": {
+      "title": "FreeLLMAPI",
+      "properties": {
+        "freellmapi.baseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:3001/v1",
+          "order": 1,
+          "description": "Base URL of the FreeLLMAPI OpenAI-compatible API, including the version path. Use the Docker/remote host when the gateway does not run on this machine."
+        },
+        "freellmapi.autoDetectBaseUrl": {
+          "type": "boolean",
+          "default": true,
+          "order": 2,
+          "description": "When the configured base URL is on this machine but unreachable, look for a FreeLLMAPI gateway on the desktop app's port (31415 by default, read from its config.json) and on 3001, then use the one that answers. Remote base URLs are never probed."
+        },
+        "freellmapi.modelCacheTtlMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "order": 3,
+          "description": "How long to cache the model catalog before refetching. 0 disables caching."
+        },
+        "freellmapi.modelFilter": {
+          "type": "string",
+          "default": "",
+          "order": 4,
+          "description": "Optional comma-separated glob patterns matched against model ids and names (for example \"auto*,claude*,gpt-*\"). Empty shows every catalog model."
+        },
+        "freellmapi.showUnavailableModels": {
+          "type": "boolean",
+          "default": false,
+          "order": 5,
+          "description": "List models the gateway cannot serve right now (no provider key, disabled, or quota exhausted). Off keeps the picker to usable models; turn it on to see and filter the full catalog."
+        },
+        "freellmapi.maxOutputTokens": {
+          "type": "number",
+          "default": 8192,
+          "minimum": 1,
+          "order": 6,
+          "description": "Maximum output tokens requested per response. Clamped to the selected model's advertised context window."
+        },
+        "freellmapi.imageInput": {
+          "type": "string",
+          "enum": [
+            "all",
+            "auto",
+            "none"
+          ],
+          "enumDescriptions": [
+            "Mark every model as accepting image input. FreeLLMAPI returns a clear error when no vision-capable model is available.",
+            "Mark only the auto/fusion router models as accepting image input.",
+            "Never advertise image input; image attachments are dropped before the request."
+          ],
+          "default": "all",
+          "order": 7,
+          "description": "How to advertise image input. The catalog does not publish per-model vision support."
+        },
+        "freellmapi.debugLogging": {
+          "type": "boolean",
+          "default": false,
+          "order": 8,
+          "description": "Log raw HTTP requests and responses (credentials redacted) to the FreeLLMAPI output channel. Very verbose; enable only while troubleshooting."
+        },
+        "freellmapi.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 9,
+          "description": "Show a FreeLLMAPI status bar item with server reachability and model availability."
+        },
+        "freellmapi.healthCheckIntervalSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 10,
+          "order": 10,
+          "description": "How often to probe the FreeLLMAPI server for the status bar and model refresh."
+        },
+        "freellmapi.server.autoStart": {
+          "type": "boolean",
+          "default": false,
+          "scope": "machine",
+          "order": 20,
+          "description": "Start the FreeLLMAPI server automatically when the extension activates and the gateway is not already reachable."
+        },
+        "freellmapi.server.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "order": 21,
+          "description": "Path to a FreeLLMAPI checkout or deployment used by \"FreeLLMAPI: Start Server\". Empty uses the first workspace folder."
+        },
+        "freellmapi.server.startCommand": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "order": 22,
+          "description": "Explicit shell command that starts the FreeLLMAPI server (for example \"npm run dev -w server\" or \"docker compose up -d\"). It runs in the configured server path. Empty auto-detects a local checkout."
+        },
+        "freellmapi.server.stopCommand": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "order": 23,
+          "description":  "Explicit shell command that stops the FreeLLMAPI server (for example \"docker compose down\"). It runs before the extension terminates any server process it spawned itself."
+        },
+        "freellmapi.server.startTimeoutSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 5,
+          "scope": "machine",
+          "order": 24,
+          "description": "How long to wait for the server to answer after it is started."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "node ./scripts/build_install/mark-dev-build.js && tsc -p ./",
+    "watch": "node ./scripts/build_install/mark-dev-build.js && tsc -watch -p ./",
+    "lint": "eslint",
+    "test": "npm run compile && node --test \"build/out/test/*.test.js\"",
+    "package": "node ./scripts/build_install/build-vsix.js",
+    "install-vsix": "node ./scripts/build_install/install-vsix.js",
+    "version:bump": "node ./scripts/version-bump.js",
+    "release": "npm run version:bump && npm run package"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^2.0.13",
+    "ai": "^6.0.39"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.104.0",
+    "@vscode/vsce": "^4.1.0",
+    "eslint": "^9.13.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.39.0"
+  }
+}
