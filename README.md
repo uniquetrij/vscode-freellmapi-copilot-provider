@@ -196,6 +196,8 @@ gh workflow run publish.yml           # or Actions -> Publish -> Run workflow
 
 The **Publish** workflow runs the tests, builds the gallery variant, re-reads `extension/package.json` out of the archive to prove no proposed APIs remain, uploads it with `vsce publish --oidc`, then builds the full VSIX and attaches it to the `v<version>` GitHub Release. That release asset is how users who want native reasoning sideload the full build.
 
+A freshly uploaded version sits in **Verifying** on the publisher's manage page while the Marketplace scans it (minutes to a few hours for a new publisher). Until that clears, `https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider` returns 404 and `code --install-extension uniquetrij.freellmapi-chat-provider` reports "not found", even though the upload succeeded.
+
 Local publishing still works with a Personal Access Token if the workflow is unavailable:
 
 ```powershell
