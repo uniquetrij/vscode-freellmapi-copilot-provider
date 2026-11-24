@@ -2,7 +2,7 @@
 
 ## Project
 
-VS Code extension that registers the `freellmapi` vendor as a native chat provider. It targets the proposed `chatProvider` and `languageModelThinkingPart` APIs and talks to a FreeLLMAPI gateway over its OpenAI-compatible `/v1` API.
+VS Code extension that registers the `freellmapi` vendor as a native chat provider. It targets the Language Model Chat Provider API (stable since VS Code 1.104), optionally uses the proposed `languageModelThinkingPart` API for native reasoning, and talks to a FreeLLMAPI gateway over its OpenAI-compatible `/v1` API.
 
 ## Commands
 

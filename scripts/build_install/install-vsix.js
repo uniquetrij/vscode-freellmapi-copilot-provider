@@ -37,13 +37,14 @@ function runShell(command) {
     }));
 }
 
-function newestVsix() {
+function newestVsix(preferMarketplace) {
     if (!fs.existsSync(BUILD_DIR)) {
         return null;
     }
 
     const files = fs.readdirSync(BUILD_DIR)
         .filter((name) => name.endsWith('.vsix'))
+        .filter((name) => /-marketplace\.vsix$/i.test(name) === preferMarketplace)
         .map((name) => {
             const filePath = path.join(BUILD_DIR, name);
             return { filePath, mtimeMs: fs.statSync(filePath).mtimeMs };
@@ -53,10 +54,14 @@ function newestVsix() {
     return files.length > 0 ? files[0].filePath : null;
 }
 
-const arg = process.argv[2];
+const args = process.argv.slice(2);
+// The marketplace variant ships without the proposed API, so reasoning would
+// fall back to plain text; local installs default to the full build.
+const preferMarketplace = args.includes('--marketplace');
+const arg = args.find((value) => !value.startsWith('--'));
 const vsixPath = arg
     ? (path.isAbsolute(arg) ? arg : path.join(ROOT, arg))
-    : newestVsix();
+    : newestVsix(preferMarketplace);
 
 if (!vsixPath) {
     fail('No .vsix file found in ./build. Run "npm run package" first.');
@@ -70,7 +75,7 @@ if (!arg) {
     console.log(`Using latest VSIX: ${vsixPath}`);
 }
 
-if (!/\+(?:build)?\d+\.vsix$/i.test(path.basename(vsixPath))) {
+if (!/\+(?:build)?\d+(?:-[a-z]+)?\.vsix$/i.test(path.basename(vsixPath))) {
     console.warn('install-vsix: WARNING: this VSIX has no build number; it was not produced by "npm run package".');
 }
 

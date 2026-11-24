@@ -1,6 +1,16 @@
 #!/usr/bin/env node
 'use strict';
 
+// Two artifacts come out of this script:
+//
+//   full (default)   keeps `enabledApiProposals` and stamps the manifest with
+//                    `+<build>` metadata, so a local install renders reasoning
+//                    natively. Built by "npm run package".
+//   marketplace      strips `enabledApiProposals` (the gallery rejects any
+//                    package that declares proposed APIs) and leaves the
+//                    release version untouched. Built by
+//                    "npm run package:marketplace".
+
 const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -20,8 +30,10 @@ const PACKAGING_TIMEOUT_MS = 5 * 60 * 1000;
 
 // The manifest version is stamped with semver build metadata for the packaged
 // copy only, so the Extensions page shows "0.1.0+N" while the committed
-// package.json keeps the release-owned version. Restoring it is best-effort on
-// any exit path, including a failed or interrupted vsce run.
+// package.json keeps the release-owned version. The marketplace variant
+// instead removes `enabledApiProposals`, which the gallery rejects. Restoring
+// the manifest is best-effort on any exit path, including a failed or
+// interrupted vsce run.
 let restoreManifest = null;
 
 function restoreManifestFile() {
@@ -144,7 +156,7 @@ function gitCommit() {
 function highestPackagedBuildNumber() {
     let highest = 0;
     for (const name of fs.readdirSync(BUILD_DIR)) {
-        const match = /\+(?:build)?(\d+)\.vsix$/i.exec(name);
+        const match = /\+(?:build)?(\d+)(?:-[a-z]+)?\.vsix$/i.exec(name);
         if (match) {
             highest = Math.max(highest, Number.parseInt(match[1], 10));
         }
@@ -195,11 +207,37 @@ function stampManifestVersion(pkg, buildNumber) {
     if (stamped === packageJsonSource) {
         fail('package.json has no "version" field to stamp.');
     }
-    fs.writeFileSync(PACKAGE_JSON_FILE, stamped, 'utf8');
+    writePackagedManifest(stamped);
+}
+
+// The gallery rejects any manifest that declares proposed APIs. Re-serializing
+// is safe here because the manifest is machine-written with two-space
+// indentation, so the packaged copy differs only by the removed field — and it
+// cannot produce invalid JSON the way hand-rolled text surgery can.
+function stripEnabledApiProposals(source) {
+    let manifest;
+    try {
+        manifest = JSON.parse(source);
+    } catch (error) {
+        fail(`package.json is not valid JSON: ${error instanceof Error ? error.message : error}`);
+    }
+
+    if (!('enabledApiProposals' in manifest)) {
+        return source;
+    }
+
+    delete manifest.enabledApiProposals;
+    console.log('Removed enabledApiProposals from the packaged manifest.');
+    return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
+function writePackagedManifest(packaged) {
+    fs.writeFileSync(PACKAGE_JSON_FILE, packaged, 'utf8');
     restoreManifest = () => fs.writeFileSync(PACKAGE_JSON_FILE, packageJsonSource, 'utf8');
 }
 
 const bumpBuildNumber = !process.argv.slice(2).includes('--no-bump');
+const marketplaceBuild = process.argv.slice(2).includes('--marketplace');
 
 assertSupportedNode();
 
@@ -209,9 +247,10 @@ fs.rmSync(BUILD_INFO_FILE, { force: true });
 const packageJsonSource = fs.readFileSync(PACKAGE_JSON_FILE, 'utf8');
 const pkg = JSON.parse(packageJsonSource);
 const buildNumber = nextBuildNumber(bumpBuildNumber);
-const vsixPath = path.join(BUILD_DIR, `${pkg.name}-${pkg.version}+${buildNumber}.vsix`);
+const variantSuffix = marketplaceBuild ? '-marketplace' : '';
+const vsixPath = path.join(BUILD_DIR, `${pkg.name}-${pkg.version}+${buildNumber}${variantSuffix}.vsix`);
 
-console.log(`=== Build #${buildNumber}: ${pkg.name} ${pkg.version} ===`);
+console.log(`=== Build #${buildNumber}: ${pkg.name} ${pkg.version} (${marketplaceBuild ? 'marketplace' : 'full'}) ===`);
 
 console.log('=== Compiling TypeScript ===');
 run(process.execPath, [TSC, '-p', '.']);
@@ -219,8 +258,13 @@ run(process.execPath, [TSC, '-p', '.']);
 console.log('=== Stamping build info ===');
 writeBuildInfo(pkg, buildNumber);
 
-console.log(`=== Stamping manifest version ${pkg.version}+${buildNumber} ===`);
-stampManifestVersion(pkg, buildNumber);
+if (marketplaceBuild) {
+    console.log('=== Stripping enabledApiProposals for the Marketplace ===');
+    writePackagedManifest(stripEnabledApiProposals(packageJsonSource));
+} else {
+    console.log(`=== Stamping manifest version ${pkg.version}+${buildNumber} ===`);
+    stampManifestVersion(pkg, buildNumber);
+}
 
 console.log('=== Packaging VSIX ===');
 packageVsix(vsixPath);

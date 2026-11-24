@@ -17,3 +17,5 @@ Initial release.
 - `freellmapi.showUnavailableModels` (default off) keeps the picker to models the gateway can serve; a full catalog can exceed 300 entries.
 - Activates on `onLanguageModelChatProvider:freellmapi` so VS Code can resolve the model list even before startup work completes.
 - Logs the first model-list resolve, so an empty picker can be diagnosed as "VS Code never asked" versus "no models returned".
+- `LanguageModelThinkingPart` is resolved at runtime: reasoning renders natively where the proposal exists and falls back to plain text (with a one-time log) where it does not, instead of throwing.
+- Two packaging variants: the full VSIX keeps `languageModelThinkingPart` for sideloading, while `npm run package:marketplace` strips it so the Marketplace accepts the upload.

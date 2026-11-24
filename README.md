@@ -18,11 +18,7 @@ FreeLLMAPI is a self-hosted router that spreads requests across free-tier provid
 
 ## Requirements
 
-- VS Code **1.104 or newer** with the **`chatProvider`** and **`languageModelThinkingPart`** API proposals enabled. On stable VS Code, launch with the extension id:
-  ```text
-  code --enable-proposed-api uniquetrij.freellmapi-chat-provider
-  ```
-  VS Code Insiders can enable proposed APIs for the extension without the flag.
+- VS Code **1.104 or newer**. `LanguageModelChatProvider` is stable there, so the extension needs no proposed APIs; only native reasoning rendering depends on one (see **Reasoning arrives as normal text** below).
 - A running FreeLLMAPI gateway (default `http://127.0.0.1:3001/v1`). The desktop app from the Microsoft Store serves it on `http://127.0.0.1:31415/v1`; the extension finds that port automatically when the configured URL does not answer.
 - A FreeLLMAPI API key. The **unified** key works for chat and usage; profile keys work for chat but return HTTP 403 from `/v1/usage`.
 
@@ -108,7 +104,7 @@ For Docker or a remote gateway, disable `server.autoStart` and manage it outside
 
 **The provider does not appear in the model picker**
 
-- Confirm VS Code 1.104+ and that the proposed APIs are enabled. On stable, start VS Code with `--enable-proposed-api uniquetrij.freellmapi-chat-provider`.
+- Confirm VS Code 1.104+; the extension only uses stable APIs in the Marketplace build.
 - Run **Developer: Reload Window**, then **FreeLLMAPI: Show Logs**.
 - **F5 is not enough for the model picker.** An Extension Development Host is a separate window that shares neither the chat session nor the agent-host model list, so models it loads never reach the chat you are using. Install into the main window instead: `npm run install-vsix` (or `code --install-extension build\<name>.vsix`), then reload.
 - The log line `VS Code requested the model list (N model(s) returned).` proves the workbench resolved the provider. If it never appears, the extension is not running in that window at all.
@@ -138,6 +134,10 @@ For Docker or a remote gateway, disable `server.autoStart` and manage it outside
 
 The extension emits a visible fallback part when the gateway returns no content, and logs the request id. Compare the request id with the FreeLLMAPI server logs (`x-request-id`).
 
+**Reasoning arrives as normal text**
+
+Reasoning is streamed through `LanguageModelThinkingPart`, which is still a proposed API. The Marketplace build therefore ships without it and renders reasoning as plain text; the log explains this once per session (`Reasoning is streamed as plain text: …`). Install the full VSIX from the matching GitHub Release to get native collapsible reasoning in a development build. A future stable VS Code release will make this switch unnecessary.
+
 ## Privacy
 
 The extension sends prompts, tool schemas, and tool results only to the configured `freellmapi.baseUrl`. The API key is stored with VS Code SecretStorage and sent as a bearer token. Debug logging redacts `authorization`, `x-api-key`, `x-goog-api-key`, `x-proxy-token`, `cookie`, and `set-cookie` headers, but request bodies (including prompt text) are logged locally when `freellmapi.debugLogging` is enabled.
@@ -146,15 +146,25 @@ The extension sends prompts, tool schemas, and tool results only to the configur
 
 ```powershell
 npm install
-npm run compile      # tsc -> build/out
-npm run watch        # incremental compile
+npm run compile              # tsc -> build/out
+npm run watch                # incremental compile
 npm run lint
-npm test             # compile + node:test (URLs, catalog, streaming client)
-npm run package      # build/<name>-<version>+<build>.vsix
-npm run install-vsix
+npm test                     # compile + node:test (URLs, catalog, client, reasoning parts)
+npm run package              # build/<name>-<version>+<build>.vsix           (full)
+npm run package:marketplace  # build/<name>-<version>+<build>-marketplace.vsix (gallery-safe)
+npm run install-vsix         # installs the newest full VSIX
 ```
 
 Press <kbd>F5</kbd> to launch an Extension Development Host. Debug builds are marked and reported in the log; packaging stamps `build/out/buildInfo.json` and a `+<build>` version suffix without changing the committed version.
+
+Two artifacts come from the same sources:
+
+| Variant | Command | `enabledApiProposals` | Reason |
+| --- | --- | --- | --- |
+| full | `npm run package` | `languageModelThinkingPart` | Native collapsible reasoning. Sideloaded from a GitHub Release; VS Code on stable logs that the proposal is unavailable and the extension degrades to plain text. |
+| marketplace | `npm run package:marketplace` | stripped | The gallery rejects any package that declares proposed APIs. |
+
+`install-vsix` prefers the full build by default; pass `--marketplace` to install the gallery variant and confirm that reasoning falls back.
 
 If the development host opens and closes after about a second, check the Run and Debug view for a session that is still marked active (the floating debug toolbar stays visible with no host window). VS Code closes the new host as soon as that stale session terminates, so press <kbd>Ctrl</kbd>+<kbd>F2</kbd> (Stop) in the main window, close any leftover `[Extension Development Host]` windows, and press <kbd>F5</kbd> again. The `Extension Development Host` window created by a working launch is attached to the debug session; stopping the session closes it.
 
@@ -166,6 +176,29 @@ The source is split into small modules:
 - `modelCatalog.ts` / `modelRegistry.ts` / `catalogClient.ts` — catalog parsing, caching, ETag revalidation.
 - `serverManager.ts` — gateway process lifecycle.
 - `config.ts`, `urls.ts`, `errors.ts`, `diagnostics.ts`, `secrets.ts`, `output.ts` — settings, normalization, errors, redaction, storage, logging.
+- `thinkingParts.ts` — resolves `LanguageModelThinkingPart` at runtime and degrades reasoning to text when the proposal is unavailable.
+
+## Publishing
+
+The Marketplace listing needs a publisher and a token that only the maintainer has:
+
+1. Create the publisher `uniquetrij` at <https://marketplace.visualstudio.com/manage> (the manifest's `publisher` field must match).
+2. In Azure DevOps, create a Personal Access Token with **Marketplace → Manage** scope and expose it as `VSCE_PAT`.
+3. Run `npm run publish:marketplace`. The script bumps the version from conventional commits, builds the gallery variant, re-reads `extension/package.json` out of the produced VSIX to prove no proposed APIs remain, then uploads it. `-- --dry-run` stops before the upload and needs no token; `-- --no-bump` publishes the current version unchanged.
+
+Release checklist:
+
+```powershell
+npm test
+npm run package                       # full build, keeps the +<build> suffix
+npm run publish:marketplace           # bump + gallery upload (needs VSCE_PAT)
+git add package.json CHANGELOG.md
+git commit -m "chore(release): v<version>"
+git tag -a v<version> -m "v<version>"
+git push --follow-tags
+```
+
+Then create a GitHub Release for the tag and attach the full VSIX from `npm run package`, so users who want native reasoning can sideload it.
 
 ## Limitations
 

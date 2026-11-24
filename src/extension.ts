@@ -11,6 +11,7 @@ import { FreeLlmApiChatProvider } from './provider';
 import { CONFIGURATION_NAMESPACE, VENDOR_ID } from './runtimeMode';
 import { clearApiKey, getApiKey, setApiKey } from './secrets';
 import { ServerManager, type ServerHealth } from './serverManager';
+import { resolveThinkingPartConstructor } from './thinkingParts';
 import { dashboardUrl, normalizeBaseUrl, usageUrl } from './urls';
 
 const CONFIG = CONFIGURATION_NAMESPACE;
@@ -34,7 +35,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			`Could not register the FreeLLMAPI chat provider: ${err instanceof Error ? err.message : String(err)}`
 		);
 		void vscode.window.showErrorMessage(
-			'FreeLLMAPI requires VS Code 1.104 or newer with the chatProvider API proposal enabled.'
+			'FreeLLMAPI requires VS Code 1.104 or newer, which provides the Language Model Chat Provider API.'
 		);
 		return;
 	}
@@ -428,9 +429,7 @@ async function selfTestCommand(
 					continue;
 				}
 
-				const ThinkingPartClass = (vscode as any).LanguageModelThinkingPart as
-					| (new (...args: any[]) => any)
-					| undefined;
+				const ThinkingPartClass = resolveThinkingPartConstructor(vscode);
 				if (ThinkingPartClass && part instanceof ThinkingPartClass) {
 					assistantParts.push(part);
 					const value = (part as any).value;

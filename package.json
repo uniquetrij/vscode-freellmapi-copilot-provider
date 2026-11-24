@@ -8,12 +8,16 @@
     "type": "git",
     "url": "https://github.com/uniquetrij/vscode-freellmapi-copilot-provider.git"
   },
+  "homepage": "https://github.com/uniquetrij/vscode-freellmapi-copilot-provider#readme",
+  "bugs": {
+    "url": "https://github.com/uniquetrij/vscode-freellmapi-copilot-provider/issues"
+  },
+  "preview": true,
   "license": "MIT",
   "engines": {
     "vscode": "^1.104.0"
   },
   "enabledApiProposals": [
-    "chatProvider",
     "languageModelThinkingPart"
   ],
   "categories": [
@@ -237,9 +241,11 @@
     "lint": "eslint",
     "test": "npm run compile && node --test \"build/out/test/*.test.js\"",
     "package": "node ./scripts/build_install/build-vsix.js",
+    "package:marketplace": "node ./scripts/build_install/build-vsix.js --marketplace",
     "install-vsix": "node ./scripts/build_install/install-vsix.js",
     "version:bump": "node ./scripts/version-bump.js",
-    "release": "npm run version:bump && npm run package"
+    "release": "npm run version:bump && npm run package",
+    "publish:marketplace": "node ./scripts/build_install/publish-vsix.js"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.13",

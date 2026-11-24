@@ -19,11 +19,14 @@ import {
 	createSessionId,
 	type ConversationSession,
 } from './sessionIdentity';
+import { createThinkingReporter } from './thinkingParts';
 
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const conversationSessions = new ConversationSessionStore(createSessionId);
 const sessionReasoningCache = new ReasoningCache();
+
+let thinkingFallbackLogged = false;
 
 export class FreeLlmApiChatProvider implements vscode.LanguageModelChatProvider {
 	private readonly registry: ModelRegistry;
@@ -170,6 +173,17 @@ export class FreeLlmApiChatProvider implements vscode.LanguageModelChatProvider 
 		}
 
 		let lastReasoning = '';
+		const reportThinking = createThinkingReporter({
+			api: vscode,
+			report: (part) => progress.report(part as vscode.LanguageModelResponsePart2),
+			fallback: (text) => progress.report(new vscode.LanguageModelTextPart(text)),
+			onUnavailable: (reason) => {
+				if (!thinkingFallbackLogged) {
+					thinkingFallbackLogged = true;
+					output.info(`Reasoning is streamed as plain text: ${reason}.`);
+				}
+			},
+		});
 		try {
 			await streamFreeLlmApi(
 				{
@@ -198,7 +212,7 @@ export class FreeLlmApiChatProvider implements vscode.LanguageModelChatProvider 
 					onThinkingDelta: (delta) => {
 						if (delta) {
 							lastReasoning += delta;
-							progress.report(new vscode.LanguageModelThinkingPart(delta));
+							reportThinking(delta);
 						}
 					},
 					onToolCall: ({ toolCallId, toolName, input }) => {
