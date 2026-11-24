@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0 - 2026-11-25
+
+### Features
+
+- prepare a Marketplace-safe build alongside the full VSIX (fe2acf1)
+  The Marketplace rejects any package that declares proposed APIs, so the
+  extension now degrades reasoning instead of requiring one:
+
+  - resolve LanguageModelThinkingPart at runtime and stream reasoning as plain
+    text (with a one-time log) when the proposal is unavailable
+  - trim enabledApiProposals to languageModelThinkingPart; chatProvider has been
+    stable since VS Code 1.104
+  - add 'npm run package:marketplace', which strips enabledApiProposals from the
+    packaged manifest and leaves the release version untouched
+  - add 'npm run publish:marketplace' to bump, build, verify the produced archive
+    is proposal-free, and upload it
+  - document both artifacts and the maintainer release checklist
+
 ## 0.1.0 — 2026-11-24
 
 Initial release.
