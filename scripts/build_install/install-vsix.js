@@ -64,7 +64,9 @@ const vsixPath = arg
     : newestVsix(preferMarketplace);
 
 if (!vsixPath) {
-    fail('No .vsix file found in ./build. Run "npm run package" first.');
+    fail(preferMarketplace
+        ? 'No *-marketplace.vsix found in ./build. Run "npm run package:marketplace" first.'
+        : 'No full .vsix found in ./build. Run "npm run package" first.');
 }
 
 if (!fs.existsSync(vsixPath)) {
