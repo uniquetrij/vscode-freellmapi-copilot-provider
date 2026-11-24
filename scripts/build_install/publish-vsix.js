@@ -9,10 +9,12 @@
 // APIs), re-reads `extension/package.json` out of the produced archive to prove
 // the upload is clean, and only then hands the file to `vsce publish`.
 //
-// Usage: node scripts/build_install/publish-vsix.js [--dry-run] [--no-bump] [--pat <token>]
+// Usage: node scripts/build_install/publish-vsix.js [--dry-run] [--no-bump] [--oidc] [--pat <token>]
 //
-// The token comes from --pat or the VSCE_PAT environment variable and needs the
-// Marketplace "Manage" scope. A dry run needs no token.
+// Authentication, in order of preference:
+//   --oidc   trusted publishing; only works inside GitHub Actions (.github/workflows/publish.yml)
+//   --pat    a Marketplace Personal Access Token, or the VSCE_PAT environment variable
+// A dry run needs no credentials.
 
 const cp = require('child_process');
 const fs = require('fs');
@@ -33,7 +35,7 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-    const options = { dryRun: false, bump: true, pat: null };
+    const options = { dryRun: false, bump: true, oidc: false, pat: null };
 
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
@@ -41,6 +43,8 @@ function parseArgs(argv) {
             options.dryRun = true;
         } else if (arg === '--no-bump') {
             options.bump = false;
+        } else if (arg === '--oidc') {
+            options.oidc = true;
         } else if (arg === '--pat') {
             options.pat = argv[++i];
         } else if (arg.startsWith('--pat=')) {
@@ -48,6 +52,10 @@ function parseArgs(argv) {
         } else {
             fail(`unknown argument: ${arg}`);
         }
+    }
+
+    if (options.oidc && options.pat) {
+        fail('--oidc and --pat are mutually exclusive.');
     }
 
     return options;
@@ -160,17 +168,22 @@ function resolveVsceCli() {
     }
 }
 
-function publish(vsixPath, pat) {
+function publish(vsixPath, { oidc, pat }) {
     const vsceCli = resolveVsceCli();
     if (!vsceCli) {
         fail('@vscode/vsce is not installed. Run "npm install" and re-run.');
     }
 
-    const result = cp.spawnSync(process.execPath, [vsceCli, 'publish', '--packagePath', vsixPath], {
+    const args = [vsceCli, 'publish', '--packagePath', vsixPath];
+    if (oidc) {
+        args.push('--oidc');
+    }
+
+    const result = cp.spawnSync(process.execPath, args, {
         cwd: ROOT,
         stdio: 'inherit',
         timeout: PUBLISH_TIMEOUT_MS,
-        env: { ...process.env, VSCE_PAT: pat }
+        env: oidc ? process.env : { ...process.env, VSCE_PAT: pat }
     });
 
     if (result.error) {
@@ -191,12 +204,17 @@ function main() {
     const options = parseArgs(process.argv.slice(2));
     const pat = options.pat || process.env.VSCE_PAT || null;
 
-    if (!options.dryRun && !pat) {
+    if (!options.dryRun && !options.oidc && !pat) {
         fail([
-            'no Marketplace token. Pass --pat <token> or set VSCE_PAT.',
-            '  Create a Personal Access Token in Azure DevOps with the Marketplace "Manage" scope,',
-            '  and create the publisher "uniquetrij" at https://marketplace.visualstudio.com/manage.'
+            'no Marketplace credentials. Pass --oidc (GitHub Actions), or --pat <token> / VSCE_PAT.',
+            '  Trusted publishing needs the policy registered under the publisher\'s "Trusted Publishing"',
+            '  tab and only works inside GitHub Actions (.github/workflows/publish.yml).',
+            '  A Personal Access Token needs the Marketplace "Manage" scope.'
         ].join('\n'));
+    }
+
+    if (options.oidc && !process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
+        console.warn('publish-vsix: warning: --oidc outside GitHub Actions usually fails; no OIDC token endpoint is set.');
     }
 
     const previousVersion = readVersion();
@@ -244,18 +262,20 @@ function main() {
     }
 
     console.log('=== Publishing to the Marketplace ===');
-    publish(vsixPath, pat);
+    publish(vsixPath, options);
 
     console.log('');
     console.log(`Published ${manifest.publisher}.${manifest.name}@${manifest.version}.`);
     console.log('');
-    console.log('=== Next steps ===');
-    console.log('  git add package.json CHANGELOG.md');
-    console.log(`  git commit -m "chore(release): v${manifest.version}"`);
-    console.log(`  git tag -a v${manifest.version} -m "v${manifest.version}"`);
-    console.log('  git push --follow-tags');
-    console.log('  Attach the full VSIX from "npm run package" to the matching GitHub Release');
-    console.log('  so reasoning still renders for people who sideload it.');
+    if (!options.oidc) {
+        console.log('=== Next steps ===');
+        console.log('  git add package.json CHANGELOG.md');
+        console.log(`  git commit -m "chore(release): v${manifest.version}"`);
+        console.log(`  git tag -a v${manifest.version} -m "v${manifest.version}"`);
+        console.log('  git push --follow-tags');
+        console.log('  Attach the full VSIX from "npm run package" to the matching GitHub Release');
+        console.log('  so reasoning still renders for people who sideload it.');
+    }
 }
 
 main();

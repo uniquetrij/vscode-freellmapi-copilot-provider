@@ -1,0 +1,65 @@
+name: Publish
+
+# Publishes the committed version to the Visual Studio Marketplace through
+# OIDC trusted publishing: the Marketplace policy for this repository
+# (publisher uniquetrij -> Trusted Publishing -> workflow "publish.yml") trusts
+# the short-lived token GitHub mints here, so no PAT is stored anywhere.
+#
+# Bump the version locally first ("npm run version:bump"), commit it with the
+# CHANGELOG entry, tag "v<version>", push, and then run this workflow.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      # Builds the gallery variant (proposed APIs stripped), re-reads
+      # extension/package.json out of the archive to prove it is uploadable,
+      # then publishes with --oidc.
+      - name: Publish to the Marketplace
+        run: node scripts/build_install/publish-vsix.js --no-bump --oidc
+
+      # People who want native reasoning need the full build, which keeps the
+      # languageModelThinkingPart proposal and is only ever distributed here.
+      - name: Build the full VSIX
+        run: npm run package -- --no-bump
+
+      - name: Attach the full VSIX to the tag's release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          tag="v${version}"
+
+          if ! git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "::warning::No ${tag} tag was pushed; skipping the GitHub Release."
+            exit 0
+          fi
+
+          vsix="$(ls build/*+*.vsix | grep -v marketplace | tail -n 1)"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "$tag" --generate-notes --verify-tag
+          gh release upload "$tag" "$vsix" --clobber

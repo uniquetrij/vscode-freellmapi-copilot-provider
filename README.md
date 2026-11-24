@@ -180,25 +180,31 @@ The source is split into small modules:
 
 ## Publishing
 
-The Marketplace listing needs a publisher and a token that only the maintainer has:
-
-1. Create the publisher `uniquetrij` at <https://marketplace.visualstudio.com/manage> (the manifest's `publisher` field must match).
-2. In Azure DevOps, create a Personal Access Token with **Marketplace → Manage** scope and expose it as `VSCE_PAT`.
-3. Run `npm run publish:marketplace`. The script bumps the version from conventional commits, builds the gallery variant, re-reads `extension/package.json` out of the produced VSIX to prove no proposed APIs remain, then uploads it. `-- --dry-run` stops before the upload and needs no token; `-- --no-bump` publishes the current version unchanged.
+Publishing runs through **OIDC trusted publishing**: the publisher `uniquetrij` (created at <https://marketplace.visualstudio.com/manage>, matching the manifest's `publisher` field) has a Trusted Publishing policy that trusts this repository's `.github/workflows/publish.yml`. GitHub mints a short-lived token for that workflow, so no Personal Access Token is stored in the repo or on any machine.
 
 Release checklist:
 
 ```powershell
 npm test
-npm run package                       # full build, keeps the +<build> suffix
-npm run publish:marketplace           # bump + gallery upload (needs VSCE_PAT)
+npm run version:bump                  # bump from conventional commits + prepend CHANGELOG section
 git add package.json CHANGELOG.md
 git commit -m "chore(release): v<version>"
 git tag -a v<version> -m "v<version>"
 git push --follow-tags
+gh workflow run publish.yml           # or Actions -> Publish -> Run workflow
 ```
 
-Then create a GitHub Release for the tag and attach the full VSIX from `npm run package`, so users who want native reasoning can sideload it.
+The **Publish** workflow runs the tests, builds the gallery variant, re-reads `extension/package.json` out of the archive to prove no proposed APIs remain, uploads it with `vsce publish --oidc`, then builds the full VSIX and attaches it to the `v<version>` GitHub Release. That release asset is how users who want native reasoning sideload the full build.
+
+Local publishing still works with a Personal Access Token if the workflow is unavailable:
+
+```powershell
+$env:VSCE_PAT = "<token with Marketplace -> Manage scope>"
+npm run publish:marketplace           # bump + build + verify + upload
+npm run publish:marketplace -- --dry-run --no-bump   # verify without uploading
+```
+
+A PAT needs an Azure DevOps organization to mint, which is exactly the setup trusted publishing avoids.
 
 ## Limitations
 
