@@ -3,7 +3,7 @@
   "publisher": "uniquetrij",
   "displayName": "FreeLLMAPI",
   "description": "Brings FreeLLMAPI's OpenAI-compatible free-model router into VS Code's native Chat model picker.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/uniquetrij/vscode-freellmapi-copilot-provider.git"
