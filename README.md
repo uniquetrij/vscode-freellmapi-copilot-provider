@@ -12,7 +12,15 @@ FreeLLMAPI is a self-hosted router that spreads requests across free-tier provid
 
 ## Install
 
-From the [Marketplace](https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider), or:
+This extension is only the VS Code client, so **install and start FreeLLMAPI first**. It is a separate project and is not bundled here:
+
+- **Desktop app** — [Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F) on Windows (signed and self-updating), or the `.dmg`/`.exe` from [Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest). It serves the API on port `31415`, which the extension detects automatically.
+- **Docker** — `curl -fsSL https://freellmapi.co/install.sh | bash` (Docker required), then open <http://localhost:3001> and copy the unified key from the **Keys** page header.
+- **Source checkout** — point `freellmapi.server.path` at it and run **FreeLLMAPI: Start Server** (see [Server management](#server-management)).
+
+Any other deployment works as long as `freellmapi.baseUrl` reaches it; the [FreeLLMAPI install guide](https://github.com/tashfeenahmed/freellmapi/blob/main/docs/en/install/01-install.md) covers Docker Compose, LAN access, and production setups. Until a gateway answers, the model picker stays empty.
+
+Then install the extension from the [Marketplace](https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider), or:
 
 ```powershell
 code --install-extension uniquetrij.freellmapi-chat-provider
@@ -43,12 +51,12 @@ Either way, reload the window after installing. See **Reasoning arrives as norma
 ## Requirements
 
 - VS Code **1.104 or newer**. `LanguageModelChatProvider` is stable there, so the extension needs no proposed APIs; only native reasoning rendering depends on one (see **Reasoning arrives as normal text** below).
-- A running FreeLLMAPI gateway (default `http://127.0.0.1:3001/v1`). The desktop app from the Microsoft Store serves it on `http://127.0.0.1:31415/v1`; the extension finds that port automatically when the configured URL does not answer.
+- **FreeLLMAPI installed and running** (default `http://127.0.0.1:3001/v1`). The extension is only a client and does not bundle the gateway, so install the desktop app, the Docker image, or a checkout first (see **Install**). The desktop app serves it on `http://127.0.0.1:31415/v1`; the extension finds that port automatically when the configured URL does not answer.
 - A FreeLLMAPI API key. The **unified** key works for chat and usage; profile keys work for chat but return HTTP 403 from `/v1/usage`.
 
 ## Quick start
 
-1. Start FreeLLMAPI yourself, or run **FreeLLMAPI: Start Server** after setting `freellmapi.server.path` to a checkout.
+1. Install and start FreeLLMAPI (see **Install**): the desktop app, the Docker one-liner, or a checkout started with **FreeLLMAPI: Start Server** after setting `freellmapi.server.path`.
 2. Run **FreeLLMAPI: Set API Key** and paste the unified key from the FreeLLMAPI dashboard (desktop app: tray icon → **Copy Key**). It is stored in VS Code SecretStorage.
 3. Open the Chat model picker and choose a FreeLLMAPI model. `auto` lets the router pick the best available model; `fusion` and `auto:<profile>` use the gateway's other routing entries.
 4. Optional: run **FreeLLMAPI: Self Test** to verify streaming and tool calling end to end.
