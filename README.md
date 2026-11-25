@@ -1,7 +1,10 @@
 # FreeLLMAPI for VS Code
 
+[![Marketplace](https://vsmarketplacebadges.dev/version/uniquetrij.freellmapi-chat-provider.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider)
+[![Installs](https://vsmarketplacebadges.dev/installs/uniquetrij.freellmapi-chat-provider.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider)
+[![Release](https://img.shields.io/github/v/release/uniquetrij/vscode-freellmapi-copilot-provider?style=flat-square&logo=github)](https://github.com/uniquetrij/vscode-freellmapi-copilot-provider/releases/latest)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.104%2B-007ACC?style=flat-square&logo=visualstudiocode)](https://code.visualstudio.com)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![License: MIT](https://img.shields.io/github/license/uniquetrij/vscode-freellmapi-copilot-provider?style=flat-square)](LICENSE)
 
 Use [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi) as a native chat provider in VS Code. The extension exposes the gateway's OpenAI-compatible model catalog in the Chat model picker, streams responses (including reasoning), forwards tool calls, and can start or stop a local FreeLLMAPI checkout.
 
