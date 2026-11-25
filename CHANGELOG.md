@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 - 2026-11-25
+
+**docs:** Remove the retired Marketplace badges from the README; shields.io discontinued the `visual-studio-marketplace` version, installs, and rating endpoints.
+
 ## 0.2.1 - 2026-11-25
 
 _No user-facing changes._
