@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.3.0 - 2026-11-25
+
+### Features
+
+- import the desktop app's unified API key automatically (f86dee8)
+  When no key is stored and the gateway is on this machine, activation now
+  calls the FreeLLMAPI desktop handshake (POST /api/auth/desktop-session then
+  GET /api/settings/api-key), validates the key against /v1/models, and writes
+  it to SecretStorage. The same flow is available as
+  'FreeLLMAPI: Detect API Key' for existing installs, and the key is never
+  logged.
+
+### Bug Fixes
+
+- keep the chat model picker populated at startup (45661ea)
+  VS Code asks a provider for its models while the window is still restoring
+  and keeps that answer for the chat session it starts, so a catalog that
+  arrived later never reached the picker even though the Language Models
+  window listed it.
+
+  - persist the last catalog in globalState and replay it during activation so
+    the first model-list request is answered without waiting for the gateway,
+    then revalidate in the background
+  - register the provider before the gateway probe and warm the list right
+    after registration
+  - activate on "*" rather than onStartupFinished so startup runs earlier
+  - drop a replayed catalog when no API key is stored and clear the stored copy
+    on invalidate
+  - document the caching and restart requirements
+
 ## 0.2.4 - 2026-11-25
 
 _No user-facing changes._
