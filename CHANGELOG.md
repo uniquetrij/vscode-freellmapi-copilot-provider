@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 - 2026-11-25
+
+_No user-facing changes._
+
 ## 0.2.0 - 2026-11-25
 
 ### Features
