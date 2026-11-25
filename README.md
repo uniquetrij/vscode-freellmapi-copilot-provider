@@ -1,8 +1,5 @@
 # FreeLLMAPI for VS Code
 
-[![Visual Studio Marketplace version](https://img.shields.io/visual-studio-marketplace/v/uniquetrij.freellmapi-chat-provider?style=flat-square&label=marketplace)](https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider)
-[![Visual Studio Marketplace installs](https://img.shields.io/visual-studio-marketplace/i/uniquetrij.freellmapi-chat-provider?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider)
-[![Visual Studio Marketplace rating](https://img.shields.io/visual-studio-marketplace/r/uniquetrij.freellmapi-chat-provider?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.104%2B-007ACC?style=flat-square&logo=visualstudiocode)](https://code.visualstudio.com)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
