@@ -34,7 +34,7 @@ That build uses only stable APIs, so the Marketplace accepts it; the trade-off i
 code --install-extension .\freellmapi-chat-provider-<version>+<build>.vsix --force
 ```
 
-Either way, reload the window after installing. See **Reasoning arrives as normal text** if the picker stays empty or reasoning is not collapsible.
+Either way, restart VS Code after installing the first time — a window reload only reaches an extension the running session already knows about. See **Reasoning arrives as normal text** if the picker stays empty or reasoning is not collapsible.
 
 ## Features
 
@@ -45,7 +45,7 @@ Either way, reload the window after installing. See **Reasoning arrives as norma
 - **Sticky routing** — a stable `x-session-id` per conversation lets FreeLLMAPI keep provider affinity and replay reasoning; every request also carries an `x-request-id` for gateway logs.
 - **Context management** — the configured output budget is reserved first, then older messages are dropped until the prompt fits the rest of the model's context window, preserving tool-call/result pairs.
 - **Server management** — start, stop, restart, and probe a local gateway. A checkout is auto-detected, or you can supply an explicit command.
-- **Zero-config key import** — on a desktop install the unified key is picked up from the local app on startup, so the picker fills without pasting anything.
+- **Zero-config key import** — on a desktop install the unified key is picked up from the local app when none is stored yet, so the picker fills without pasting anything. The handshake is loopback-only and never queries a remote gateway.
 - **Usage report** — reads `GET /v1/usage` and breaks down requests/tokens by platform and key.
 - **Diagnostics** — connection check, self-test, status bar health indicator, and separate extension/server output channels. Debug logging redacts credential headers.
 - **Configurable endpoint** — localhost by default; point it at Docker, a LAN host, or a remote deployment.
@@ -54,7 +54,7 @@ Either way, reload the window after installing. See **Reasoning arrives as norma
 
 - VS Code **1.104 or newer**. `LanguageModelChatProvider` is stable there, so the extension needs no proposed APIs; only native reasoning rendering depends on one (see **Reasoning arrives as normal text** below).
 - **FreeLLMAPI installed and running** (default `http://127.0.0.1:3001/v1`). The extension is only a client and does not bundle the gateway, so install the desktop app, the Docker image, or a checkout first (see **Install**). The desktop app serves it on `http://127.0.0.1:31415/v1`; the extension finds that port automatically when the configured URL does not answer.
-- A FreeLLMAPI API key. The **unified** key works for chat and usage; profile keys work for chat but return HTTP 403 from `/v1/usage`.
+- A FreeLLMAPI API key — imported automatically on a desktop install, entered by hand otherwise (see **Quick start**). The **unified** key works for chat and usage; profile keys work for chat but return HTTP 403 from `/v1/usage`.
 
 ## Quick start
 
@@ -149,6 +149,12 @@ For Docker or a remote gateway, disable `server.autoStart` and manage it outside
 **The picker is empty for a moment after startup, or shows an older catalog**
 
 VS Code asks a provider for its models while the window is still restoring and keeps that answer for the chat session it is starting, so the extension now activates at startup, answers from the catalog cached in global storage, and revalidates against the gateway in the background. The first answer is therefore never empty as long as a key is stored; run **FreeLLMAPI: Refresh Model List** if the gateway changed in the meantime.
+
+**The desktop key was not imported automatically**
+
+- Automatic import runs once per window, only when no key is stored yet; a stored key is never overwritten. Run **FreeLLMAPI: Detect API Key** to retry, or **FreeLLMAPI: Clear API Key** to drop a stale key and let the next startup import again.
+- The handshake is refused unless the gateway is on loopback: `POST /api/auth/desktop-session` requires the desktop build (`FREEAPI_DESKTOP=1`) and a local `Host` header. Docker, a LAN address, and remote gateways do not answer it, so those need **Set API Key**.
+- Pressing **Set API Key** yourself during that window leaves the automatic import with nothing to do.
 
 **`FreeLLMAPI is not reachable`**
 
@@ -252,7 +258,7 @@ A PAT needs an Azure DevOps organization to mint, which is exactly the setup tru
 ## Limitations
 
 - `/v1/models` does not advertise per-model vision support, so `imageInput` is a global heuristic rather than a capability read from the gateway.
-- `/v1/models` requires the unified key: it answers `401` without one, so the picker stays empty until **FreeLLMAPI: Set API Key** succeeds. Only `/api/ping` is reachable unauthenticated (which is what gateway auto-detection probes).
+- `/v1/models` requires the unified key: it answers `401` without one, so the picker stays empty until a key is stored — imported from the desktop app or entered with **FreeLLMAPI: Set API Key**. Only `/api/ping` is reachable unauthenticated (which is what gateway auto-detection probes).
 - The extension does not implement its own failover; it relies on FreeLLMAPI's router and reports the gateway's final errors.
 - Token counts are estimated from characters, not a tokenizer.
 - Usage requires the unified key and the gateway's `/v1/usage` endpoint.
