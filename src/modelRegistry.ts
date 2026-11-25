@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { CATALOG_CACHE_STORAGE_KEY, createCatalogCacheEntry, readCatalogCache } from './catalogCache';
 import { getConfig } from './config';
 import { fetchModelCatalog } from './catalogClient';
 import { wrapApiError } from './errors';
@@ -19,14 +20,64 @@ export class ModelRegistry {
 	private inFlightModels: Promise<vscode.LanguageModelChatInformation[]> | undefined;
 	private revalidationTimer: NodeJS.Timeout | undefined;
 	private warnedMissingKey = false;
+	/** True while the list is only the copy replayed from storage. */
+	private replayed = false;
 
-	constructor(private readonly secrets: vscode.SecretStorage) {}
+	constructor(
+		private readonly secrets: vscode.SecretStorage,
+		private readonly storage?: vscode.Memento
+	) {
+		this.replayStoredCatalog();
+	}
+
+	/**
+	 * VS Code asks a provider for its models while the window is still
+	 * restoring, and the chat harness keeps the answer it gets at that moment
+	 * for the whole session. Answering from the last catalog on disk keeps that
+	 * first answer non-empty even when the gateway has not replied yet.
+	 */
+	private replayStoredCatalog(): void {
+		if (!this.storage) {
+			return;
+		}
+		let baseUrl: string;
+		try {
+			baseUrl = getConfig().baseUrl;
+		} catch {
+			return;
+		}
+		const stored = readCatalogCache<vscode.LanguageModelChatInformation>(
+			this.storage.get<unknown>(CATALOG_CACHE_STORAGE_KEY),
+			baseUrl
+		);
+		if (!stored) {
+			return;
+		}
+		this.cachedModels = stored.models as vscode.LanguageModelChatInformation[];
+		// Left undefined so the next request still revalidates against the gateway.
+		this.cachedAtMs = undefined;
+		this.replayed = true;
+	}
+
+	private storeCatalog(baseUrl: string, cachedAtMs: number, models: readonly vscode.LanguageModelChatInformation[]): void {
+		if (!this.storage) {
+			return;
+		}
+		const value = models.length > 0
+			? createCatalogCacheEntry(baseUrl, cachedAtMs, models)
+			: undefined;
+		void Promise.resolve(this.storage.update(CATALOG_CACHE_STORAGE_KEY, value)).catch(() => undefined);
+	}
 
 	invalidate(): void {
 		this.cachedAtMs = undefined;
 		this.cachedModels = undefined;
 		this.cachedEtags.clear();
 		this.warnedMissingKey = false;
+		this.replayed = false;
+		void Promise.resolve(this.storage?.update(CATALOG_CACHE_STORAGE_KEY, undefined)).catch(
+			() => undefined
+		);
 		this._onDidChange.fire();
 	}
 
@@ -43,7 +94,11 @@ export class ModelRegistry {
 	}
 
 	hasCachedCatalog(): boolean {
-		return this.cachedModels !== undefined;
+		return this.cachedModels !== undefined && !this.replayed;
+	}
+
+	hasReplayedCatalog(): boolean {
+		return this.replayed;
 	}
 
 	async getModels(options: { force?: boolean } = {}): Promise<vscode.LanguageModelChatInformation[]> {
@@ -92,6 +147,8 @@ export class ModelRegistry {
 			this.cachedModels = [];
 			this.cachedAtMs = now;
 			this.cachedEtags.clear();
+			this.replayed = false;
+			this.storeCatalog(config.baseUrl, now, []);
 			return this.cachedModels;
 		}
 
@@ -109,6 +166,8 @@ export class ModelRegistry {
 					throw new Error(`FreeLLMAPI reported no model catalog change, but nothing is cached (${url}).`);
 				}
 				this.cachedAtMs = now;
+				this.replayed = false;
+				this.storeCatalog(config.baseUrl, now, this.cachedModels);
 				return this.cachedModels;
 			}
 
@@ -139,6 +198,8 @@ export class ModelRegistry {
 			this.cachedModels = models;
 			this.cachedAtMs = now;
 			this.warnedMissingKey = false;
+			this.replayed = false;
+			this.storeCatalog(config.baseUrl, now, models);
 
 			const available = result.models.filter((model) => model.available).length;
 			const hidden = result.models.length - available;

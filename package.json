@@ -37,6 +37,7 @@
   "icon": "assets/icon.png",
   "main": "./build/out/extension.js",
   "activationEvents": [
+    "*",
     "onStartupFinished",
     "onLanguageModelChatProvider:freellmapi",
     "onCommand:freellmapi.setApiKey",

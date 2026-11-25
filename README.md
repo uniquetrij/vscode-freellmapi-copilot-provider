@@ -39,6 +39,7 @@ Either way, reload the window after installing. See **Reasoning arrives as norma
 ## Features
 
 - **Native model picker** — every model in `GET /v1/models` is listed, including models that currently need a provider key, are disabled, or have exhausted their quota. Status is shown in the picker detail and tooltip.
+- **Instant picker on startup** — the last catalog is cached in global storage, so the model list is already there while VS Code restores the window and the chat session starts; it is revalidated in the background.
 - **Streaming chat** — text, reasoning (`reasoning_content`), usage, and tool calls stream into VS Code Chat.
 - **Tool calling** — VS Code tools are converted to the OpenAI tool schema; tool names are sanitized and mapped back to the original names.
 - **Sticky routing** — a stable `x-session-id` per conversation lets FreeLLMAPI keep provider affinity and replay reasoning; every request also carries an `x-request-id` for gateway logs.
@@ -140,9 +141,14 @@ For Docker or a remote gateway, disable `server.autoStart` and manage it outside
 
 - Confirm VS Code 1.104+; the extension only uses stable APIs in the Marketplace build.
 - Run **Developer: Reload Window**, then **FreeLLMAPI: Show Logs**.
+- **A freshly installed extension needs a full VS Code restart**, not a reload: `code --install-extension` only takes effect in a new application session.
 - **F5 is not enough for the model picker.** An Extension Development Host is a separate window that shares neither the chat session nor the agent-host model list, so models it loads never reach the chat you are using. Install into the main window instead: `npm run install-vsix` (or `code --install-extension build\<name>.vsix`), then reload.
 - The log line `VS Code requested the model list (N model(s) returned).` proves the workbench resolved the provider. If it never appears, the extension is not running in that window at all.
 - A provider with no API key intentionally returns an empty model list, because FreeLLMAPI requires a bearer token even for `GET /v1/models`. Run **FreeLLMAPI: Set API Key** with the unified `freellmapi-...` key from the dashboard; the log line names the dashboard URL.
+
+**The picker is empty for a moment after startup, or shows an older catalog**
+
+VS Code asks a provider for its models while the window is still restoring and keeps that answer for the chat session it is starting, so the extension now activates at startup, answers from the catalog cached in global storage, and revalidates against the gateway in the background. The first answer is therefore never empty as long as a key is stored; run **FreeLLMAPI: Refresh Model List** if the gateway changed in the meantime.
 
 **`FreeLLMAPI is not reachable`**
 

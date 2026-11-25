@@ -25,10 +25,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	const server = new ServerManager(context.secrets);
 	context.subscriptions.push(output, provider, server);
 
-	// Runs before the provider registers so the first catalog fetch already uses
-	// the detected port (the desktop app does not listen on 3001).
-	const discovered = await detectGateway(server);
-
 	try {
 		context.subscriptions.push(vscode.lm.registerLanguageModelChatProvider(VENDOR_ID, provider));
 	} catch (err) {
@@ -40,6 +36,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		);
 		return;
 	}
+
+	// Registered before the gateway probe so the provider is in place while the
+	// window is still restoring: VS Code snapshots a provider's models when it
+	// starts a chat session, and a list that arrives later never reaches that
+	// session's picker.
+	void warmModelList(context, provider);
+
+	// Probing and port discovery happen after registration so a slow probe
+	// cannot delay it; the catalog is refetched below once the port is known.
+	const discovered = await detectGateway(server);
 
 	const statusBar = new FreeLlmApiStatusBar(context, provider, server);
 	context.subscriptions.push(statusBar);
@@ -84,6 +90,30 @@ export function deactivate(): void {
 	// The gateway is shared by every window and may serve other clients, so a
 	// server this extension started is left running. "FreeLLMAPI: Stop Server"
 	// stops it deliberately.
+}
+
+/**
+ * Makes the model list available as early as possible: asks VS Code for it once
+ * so the provider is queried during startup instead of on first use, then
+ * revalidates the replayed catalog. Without a stored key the replayed models
+ * could not be called, so they are dropped instead of offered.
+ */
+async function warmModelList(
+	context: vscode.ExtensionContext,
+	provider: FreeLlmApiChatProvider
+): Promise<void> {
+	try {
+		if (!(await getApiKey(context.secrets))) {
+			provider.dropReplayedModels();
+			return;
+		}
+		if (vscode.lm?.selectChatModels) {
+			await vscode.lm.selectChatModels({ vendor: VENDOR_ID });
+		}
+	} catch {
+		// The provider logs catalog failures; warming must never break activation.
+	}
+	void provider.refreshModels();
 }
 
 // ---------------------------------------------------------------------------

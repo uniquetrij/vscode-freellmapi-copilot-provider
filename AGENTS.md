@@ -24,7 +24,8 @@ Press F5 for an Extension Development Host. Packaging requires Node >= 22 (VS Co
 - `src/provider.ts` — `LanguageModelChatProvider`; maps VS Code messages/tools to AI SDK shapes and back, truncates context, emits text/thinking/tool/usage parts.
 - `src/freellmapiClient.ts` — lazy `ai` + `@ai-sdk/openai-compatible` streaming, debug fetch, tool input normalization.
 - `src/modelCatalog.ts` — pure parsing/mapping/sorting of `GET /v1/models`.
-- `src/modelRegistry.ts` — TTL cache, ETag revalidation, change events, last-known-good fallback.
+- `src/modelRegistry.ts` — TTL cache, ETag revalidation, change events, last-known-good fallback, persisted catalog replay.
+- `src/catalogCache.ts` — validation of the catalog persisted in `globalState` (gateway identity, model shape).
 - `src/catalogClient.ts` — catalog HTTP fetch shared by the registry and commands.
 - `src/serverManager.ts` — gateway probe/start/stop and process-tree termination.
 - `src/gatewayDiscovery.ts`, `src/desktopKey.ts` — desktop app port discovery and loopback-only unified-key import (`/api/auth/desktop-session` → `/api/settings/api-key`).
@@ -35,7 +36,8 @@ Press F5 for an Extension Development Host. Packaging requires Node >= 22 (VS Co
 
 ## Conventions
 
-- Keep `modelCatalog.ts`, `urls.ts`, `gatewayDiscovery.ts`, `desktopKey.ts`, and the error helpers free of `vscode` value imports so they stay unit-testable.
+- Keep `modelCatalog.ts`, `catalogCache.ts`, `urls.ts`, `gatewayDiscovery.ts`, `desktopKey.ts`, and the error helpers free of `vscode` value imports so they stay unit-testable.
+- Activation registers the provider before the gateway probe and answers the first model-list request from the persisted catalog; VS Code snapshots a provider's models when it launches a chat session (during window restore), so `provideLanguageModelChatInformation` must never block on HTTP when a cached list exists. Keep that ordering when editing `extension.ts`.
 - Do not log API keys. Use `redactHeaders` / `redactHeaderRecord`; debug request bodies still contain prompts.
 - Preserve tool-call/tool-result pairs when changing truncation.
 - The gateway is shared: do not auto-kill a managed server on deactivation.

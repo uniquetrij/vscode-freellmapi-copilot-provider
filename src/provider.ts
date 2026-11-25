@@ -35,7 +35,7 @@ export class FreeLlmApiChatProvider implements vscode.LanguageModelChatProvider 
 	private hasLoggedResolve = false;
 
 	constructor(private readonly context: vscode.ExtensionContext) {
-		this.registry = new ModelRegistry(context.secrets);
+		this.registry = new ModelRegistry(context.secrets, context.globalState);
 		this.registry.onDidChange(() => this.onDidChangeEmitter.fire());
 	}
 
@@ -50,6 +50,13 @@ export class FreeLlmApiChatProvider implements vscode.LanguageModelChatProvider 
 
 	hasLoadedModels(): boolean {
 		return this.registry.hasCachedCatalog();
+	}
+
+	/** Drops a catalog replayed from storage that cannot be used without a key. */
+	dropReplayedModels(): void {
+		if (this.registry.hasReplayedCatalog()) {
+			this.registry.invalidate();
+		}
 	}
 
 	async refreshModels(force = false): Promise<void> {
@@ -68,19 +75,21 @@ export class FreeLlmApiChatProvider implements vscode.LanguageModelChatProvider 
 		void _options;
 		void _token;
 		const output = getOutputChannel();
+
+		// VS Code pulls this list while the window restores and keeps the answer
+		// for the chat session it is starting, so a known list is returned
+		// without waiting for the gateway and revalidated in the background.
+		const known = this.registry.getCachedModels();
+		if (known.length > 0) {
+			void this.registry.getModels().catch(() => undefined);
+			this.logResolve(known.length);
+			return known;
+		}
+
 		return this.registry
 			.getModels()
 			.then((models) => {
-				// The first resolve is what makes the models show up in the picker;
-				// log it once at info level so a silent "picker is empty" report is
-				// diagnosable from the log alone.
-				const message = `VS Code requested the model list (${models.length} model(s) returned).`;
-				if (this.hasLoggedResolve) {
-					output.debug(message);
-				} else {
-					this.hasLoggedResolve = true;
-					output.info(message);
-				}
+				this.logResolve(models.length);
 				return models;
 			})
 			.catch((err) => {
@@ -89,6 +98,22 @@ export class FreeLlmApiChatProvider implements vscode.LanguageModelChatProvider 
 				);
 				return [];
 			});
+	}
+
+	/**
+	 * The first resolve is what makes the models show up in the picker; log it
+	 * once at info level so a silent "picker is empty" report is diagnosable
+	 * from the log alone.
+	 */
+	private logResolve(count: number): void {
+		const message = `VS Code requested the model list (${count} model(s) returned).`;
+		const output = getOutputChannel();
+		if (this.hasLoggedResolve) {
+			output.debug(message);
+		} else {
+			this.hasLoggedResolve = true;
+			output.info(message);
+		}
 	}
 
 	async provideLanguageModelChatResponse(
