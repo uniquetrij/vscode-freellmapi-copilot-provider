@@ -1,8 +1,32 @@
 # FreeLLMAPI for VS Code
 
+[![Visual Studio Marketplace version](https://img.shields.io/visual-studio-marketplace/v/uniquetrij.freellmapi-chat-provider?style=flat-square&label=marketplace)](https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider)
+[![Visual Studio Marketplace installs](https://img.shields.io/visual-studio-marketplace/i/uniquetrij.freellmapi-chat-provider?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider)
+[![Visual Studio Marketplace rating](https://img.shields.io/visual-studio-marketplace/r/uniquetrij.freellmapi-chat-provider?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider)
+[![VS Code](https://img.shields.io/badge/VS%20Code-1.104%2B-007ACC?style=flat-square&logo=visualstudiocode)](https://code.visualstudio.com)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+
 Use [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi) as a native chat provider in VS Code. The extension exposes the gateway's OpenAI-compatible model catalog in the Chat model picker, streams responses (including reasoning), forwards tool calls, and can start or stop a local FreeLLMAPI checkout.
 
 FreeLLMAPI is a self-hosted router that spreads requests across free-tier providers and fails over when a provider is unavailable. This extension talks to its `/v1` API; it does not bundle the gateway or any provider credentials.
+
+## Install
+
+From the [Marketplace](https://marketplace.visualstudio.com/items?itemName=uniquetrij.freellmapi-chat-provider), or:
+
+```powershell
+code --install-extension uniquetrij.freellmapi-chat-provider
+```
+
+That build uses only stable APIs, so the Marketplace accepts it; the trade-off is that reasoning arrives as plain text.
+
+**Native reasoning** needs the proposed `languageModelThinkingPart` API, so it ships as a VSIX attached to the [latest release](https://github.com/uniquetrij/vscode-freellmapi-copilot-provider/releases/latest):
+
+```powershell
+code --install-extension .\freellmapi-chat-provider-<version>+<build>.vsix --force
+```
+
+Either way, reload the window after installing. See **Reasoning arrives as normal text** if the picker stays empty or reasoning is not collapsible.
 
 ## Features
 
