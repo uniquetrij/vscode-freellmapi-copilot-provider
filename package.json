@@ -40,6 +40,7 @@
     "onStartupFinished",
     "onLanguageModelChatProvider:freellmapi",
     "onCommand:freellmapi.setApiKey",
+    "onCommand:freellmapi.detectApiKey",
     "onCommand:freellmapi.clearApiKey",
     "onCommand:freellmapi.setBaseUrl",
     "onCommand:freellmapi.refreshModels",
@@ -65,6 +66,10 @@
       {
         "command": "freellmapi.setApiKey",
         "title": "FreeLLMAPI: Set API Key"
+      },
+      {
+        "command": "freellmapi.detectApiKey",
+        "title": "FreeLLMAPI: Detect API Key"
       },
       {
         "command": "freellmapi.clearApiKey",

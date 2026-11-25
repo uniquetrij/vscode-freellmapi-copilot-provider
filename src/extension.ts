@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { describeBuild } from './buildInfo';
 import { fetchModelCatalog } from './catalogClient';
 import { getConfig, getServerConfig, setBaseUrlOverride } from './config';
+import { fetchDesktopUnifiedKey, type AdoptedDesktopKey } from './desktopKey';
 import { safeJson, serializeError } from './diagnostics';
 import { formatHttpError, formatUnreachable } from './errors';
 import { createNodeDiscoveryHost, discoverLoopbackGateway, type DiscoveredGateway } from './gatewayDiscovery';
@@ -12,7 +13,7 @@ import { CONFIGURATION_NAMESPACE, VENDOR_ID } from './runtimeMode';
 import { clearApiKey, getApiKey, setApiKey } from './secrets';
 import { ServerManager, type ServerHealth } from './serverManager';
 import { resolveThinkingPartConstructor } from './thinkingParts';
-import { dashboardUrl, normalizeBaseUrl, usageUrl } from './urls';
+import { dashboardUrl, normalizeBaseUrl, originFromBaseUrl, usageUrl } from './urls';
 
 const CONFIG = CONFIGURATION_NAMESPACE;
 
@@ -46,6 +47,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand(`${CONFIG}.setApiKey`, () => setApiKeyCommand(context, provider)),
+		vscode.commands.registerCommand(`${CONFIG}.detectApiKey`, () => detectApiKeyCommand(context, provider, statusBar)),
 		vscode.commands.registerCommand(`${CONFIG}.clearApiKey`, () => clearApiKeyCommand(context, provider)),
 		vscode.commands.registerCommand(`${CONFIG}.setBaseUrl`, () => setBaseUrlCommand(provider)),
 		vscode.commands.registerCommand(`${CONFIG}.refreshModels`, () => refreshModelsCommand(provider, server)),
@@ -75,7 +77,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	void announceDetectedGateway(discovered, provider, statusBar);
 	void autoStartServer(provider, server);
-	void promptForKeyOnce(context);
+	void adoptDesktopKeyThenPrompt(context, provider, statusBar);
 }
 
 export function deactivate(): void {
@@ -707,7 +709,9 @@ async function showStatusCommand(
 		{
 			label: '$(key) API key',
 			description: apiKey ? 'Configured' : 'Not set',
-			detail: apiKey ? 'Stored in VS Code SecretStorage.' : 'Run "FreeLLMAPI: Set API Key".',
+			detail: apiKey
+				? 'Stored in VS Code SecretStorage.'
+				: 'Run "FreeLLMAPI: Detect API Key" for a local desktop app, or "FreeLLMAPI: Set API Key".',
 		},
 		{
 			label: '$(symbol-class) Models',
@@ -716,6 +720,7 @@ async function showStatusCommand(
 		},
 		{ label: '', kind: vscode.QuickPickItemKind.Separator },
 		{ label: '$(key) Set API Key', command: `${CONFIG}.setApiKey` },
+		{ label: '$(search) Detect API Key', command: `${CONFIG}.detectApiKey` },
 		{ label: '$(refresh) Refresh Models', command: `${CONFIG}.refreshModels` },
 		health.reachable
 			? { label: '$(debug-stop) Stop Server', command: `${CONFIG}.stopServer` }
@@ -752,6 +757,8 @@ async function handleServerAction(action: string | undefined): Promise<void> {
 		await vscode.commands.executeCommand(`${CONFIG}.startServer`);
 	} else if (action === 'Set API Key') {
 		await vscode.commands.executeCommand(`${CONFIG}.setApiKey`);
+	} else if (action === 'Detect API Key') {
+		await vscode.commands.executeCommand(`${CONFIG}.detectApiKey`);
 	} else if (action === 'Open Settings') {
 		await vscode.commands.executeCommand('workbench.action.openSettings', CONFIG);
 	} else if (action === 'Show Logs') {
@@ -1051,5 +1058,141 @@ async function promptForKeyOnce(context: vscode.ExtensionContext): Promise<void>
 	);
 	if (action === 'Set API Key') {
 		await vscode.commands.executeCommand(`${CONFIG}.setApiKey`);
+	}
+}
+
+async function adoptDesktopKeyThenPrompt(
+	context: vscode.ExtensionContext,
+	provider: FreeLlmApiChatProvider,
+	statusBar: FreeLlmApiStatusBar
+): Promise<void> {
+	if (await adoptDesktopKey(context, provider, statusBar)) {
+		return;
+	}
+	await promptForKeyOnce(context);
+}
+
+/** Imports the desktop app's unified key when this window has none stored yet. */
+async function adoptDesktopKey(
+	context: vscode.ExtensionContext,
+	provider: FreeLlmApiChatProvider,
+	statusBar: FreeLlmApiStatusBar
+): Promise<boolean> {
+	if (await getApiKey(context.secrets)) {
+		return false;
+	}
+
+	let adopted: AdoptedDesktopKey | undefined;
+	try {
+		adopted = await fetchDesktopUnifiedKey(getConfigSafeBaseUrl());
+	} catch (err) {
+		getOutputChannel().warn(
+			`Could not read the local FreeLLMAPI API key: ${err instanceof Error ? err.message : String(err)}`
+		);
+		return false;
+	}
+	if (!adopted) {
+		return false;
+	}
+	return storeAdoptedKey(context, provider, statusBar, adopted, false);
+}
+
+async function detectApiKeyCommand(
+	context: vscode.ExtensionContext,
+	provider: FreeLlmApiChatProvider,
+	statusBar: FreeLlmApiStatusBar
+): Promise<void> {
+	const output = getOutputChannel();
+	const baseUrl = getConfigSafeBaseUrl();
+	let origin = baseUrl;
+	try {
+		origin = originFromBaseUrl(baseUrl);
+	} catch {
+		// Keep the raw setting in the message; the gateway probe will explain it.
+	}
+
+	let adopted: AdoptedDesktopKey | undefined;
+	try {
+		adopted = await fetchDesktopUnifiedKey(baseUrl);
+	} catch (err) {
+		output.warn(`Key detection failed: ${err instanceof Error ? err.message : String(err)}`);
+	}
+
+	if (!adopted) {
+		const action = await vscode.window.showWarningMessage(
+			`No FreeLLMAPI desktop app handed out a key at ${origin}. Detection only works when the desktop app runs on this machine; Docker and remote gateways need the key entered by hand.`,
+			'Set API Key',
+			'Show Logs'
+		);
+		if (action === 'Set API Key') {
+			await vscode.commands.executeCommand(`${CONFIG}.setApiKey`);
+		} else if (action === 'Show Logs') {
+			output.show(true);
+		}
+		return;
+	}
+
+	const existing = await getApiKey(context.secrets);
+	if (existing && existing !== adopted.apiKey) {
+		const choice = await vscode.window.showWarningMessage(
+			`Replace the stored FreeLLMAPI API key with the one from ${adopted.origin}?`,
+			{ modal: true },
+			'Replace'
+		);
+		if (choice !== 'Replace') {
+			return;
+		}
+	}
+
+	await storeAdoptedKey(context, provider, statusBar, adopted, true);
+}
+
+async function storeAdoptedKey(
+	context: vscode.ExtensionContext,
+	provider: FreeLlmApiChatProvider,
+	statusBar: FreeLlmApiStatusBar,
+	adopted: AdoptedDesktopKey,
+	announce: boolean
+): Promise<boolean> {
+	const output = getOutputChannel();
+	const baseUrl = getConfigSafeBaseUrl();
+
+	try {
+		const catalog = await fetchModelCatalog(baseUrl, adopted.apiKey, { timeoutMs: 10_000 });
+		if (!catalog.ok) {
+			output.warn(
+				`The FreeLLMAPI desktop app at ${adopted.origin} returned an API key, but ${baseUrl} rejected it (HTTP ${catalog.status}).`
+			);
+			if (announce) {
+				const action = await vscode.window.showWarningMessage(
+					`The desktop app's API key was rejected by ${baseUrl} (HTTP ${catalog.status}).`,
+					'Set API Key'
+				);
+				if (action === 'Set API Key') {
+					await vscode.commands.executeCommand(`${CONFIG}.setApiKey`);
+				}
+			}
+			return false;
+		}
+
+		await setApiKey(context.secrets, adopted.apiKey);
+		await provider.refreshModels(true);
+		statusBar.refreshNow();
+		output.info(
+			`Imported the FreeLLMAPI desktop app's unified API key from ${adopted.origin} (${catalog.models.length} model(s) listed).`
+		);
+		if (announce) {
+			void vscode.window.showInformationMessage(
+				catalog.models.length > 0
+					? `FreeLLMAPI API key imported from the desktop app. ${catalog.models.length} model(s) available.`
+					: 'FreeLLMAPI API key imported from the desktop app.'
+			);
+		}
+		return true;
+	} catch (err) {
+		output.warn(
+			`The desktop app's API key could not be verified: ${err instanceof Error ? err.message : String(err)}`
+		);
+		return false;
 	}
 }

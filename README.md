@@ -44,6 +44,7 @@ Either way, reload the window after installing. See **Reasoning arrives as norma
 - **Sticky routing** — a stable `x-session-id` per conversation lets FreeLLMAPI keep provider affinity and replay reasoning; every request also carries an `x-request-id` for gateway logs.
 - **Context management** — the configured output budget is reserved first, then older messages are dropped until the prompt fits the rest of the model's context window, preserving tool-call/result pairs.
 - **Server management** — start, stop, restart, and probe a local gateway. A checkout is auto-detected, or you can supply an explicit command.
+- **Zero-config key import** — on a desktop install the unified key is picked up from the local app on startup, so the picker fills without pasting anything.
 - **Usage report** — reads `GET /v1/usage` and breaks down requests/tokens by platform and key.
 - **Diagnostics** — connection check, self-test, status bar health indicator, and separate extension/server output channels. Debug logging redacts credential headers.
 - **Configurable endpoint** — localhost by default; point it at Docker, a LAN host, or a remote deployment.
@@ -57,7 +58,7 @@ Either way, reload the window after installing. See **Reasoning arrives as norma
 ## Quick start
 
 1. Install and start FreeLLMAPI (see **Install**): the desktop app, the Docker one-liner, or a checkout started with **FreeLLMAPI: Start Server** after setting `freellmapi.server.path`.
-2. Run **FreeLLMAPI: Set API Key** and paste the unified key from the FreeLLMAPI dashboard (desktop app: tray icon → **Copy Key**). It is stored in VS Code SecretStorage.
+2. The desktop app's unified key is imported automatically on startup when no key is stored. For Docker, a remote gateway, or a key you prefer to set yourself, run **FreeLLMAPI: Set API Key** and paste the key from the dashboard (desktop app: tray icon → **Copy Key**). Either way it is stored in VS Code SecretStorage.
 3. Open the Chat model picker and choose a FreeLLMAPI model. `auto` lets the router pick the best available model; `fusion` and `auto:<profile>` use the gateway's other routing entries.
 4. Optional: run **FreeLLMAPI: Self Test** to verify streaming and tool calling end to end.
 
@@ -86,6 +87,7 @@ Either way, reload the window after installing. See **Reasoning arrives as norma
 | Command | Purpose |
 | --- | --- |
 | **FreeLLMAPI: Set API Key** | Validate the key against `/v1/models` and save it to SecretStorage. |
+| **FreeLLMAPI: Detect API Key** | Ask a local desktop app for its unified key and import it (`POST /api/auth/desktop-session` → `GET /api/settings/api-key`). Desktop installs only; Docker and remote gateways answer 403. |
 | **FreeLLMAPI: Clear API Key** | Remove the stored key and empty the model picker. |
 | **FreeLLMAPI: Set Base URL** | Change and normalize the gateway URL. |
 | **FreeLLMAPI: Refresh Model List** | Refetch the catalog and notify VS Code. |
@@ -172,7 +174,7 @@ Reasoning is streamed through `LanguageModelThinkingPart`, which is still a prop
 
 ## Privacy
 
-The extension sends prompts, tool schemas, and tool results only to the configured `freellmapi.baseUrl`. The API key is stored with VS Code SecretStorage and sent as a bearer token. Debug logging redacts `authorization`, `x-api-key`, `x-goog-api-key`, `x-proxy-token`, `cookie`, and `set-cookie` headers, but request bodies (including prompt text) are logged locally when `freellmapi.debugLogging` is enabled.
+The extension sends prompts, tool schemas, and tool results only to the configured `freellmapi.baseUrl`. The API key is stored with VS Code SecretStorage and sent as a bearer token. When no key is stored and the gateway is on this machine, the extension asks the FreeLLMAPI desktop app for its unified key (a loopback-only `POST /api/auth/desktop-session` followed by `GET /api/settings/api-key`); the key is written straight to SecretStorage and never logged. Debug logging redacts `authorization`, `x-api-key`, `x-goog-api-key`, `x-proxy-token`, `cookie`, and `set-cookie` headers, but request bodies (including prompt text) are logged locally when `freellmapi.debugLogging` is enabled.
 
 ## Development
 
@@ -207,6 +209,7 @@ The source is split into small modules:
 - `freellmapiClient.ts` — `@ai-sdk/openai-compatible` streaming and debug fetch.
 - `modelCatalog.ts` / `modelRegistry.ts` / `catalogClient.ts` — catalog parsing, caching, ETag revalidation.
 - `serverManager.ts` — gateway process lifecycle.
+- `gatewayDiscovery.ts`, `desktopKey.ts` — desktop app port and unified-key discovery (loopback only).
 - `config.ts`, `urls.ts`, `errors.ts`, `diagnostics.ts`, `secrets.ts`, `output.ts` — settings, normalization, errors, redaction, storage, logging.
 - `thinkingParts.ts` — resolves `LanguageModelThinkingPart` at runtime and degrades reasoning to text when the proposal is unavailable.
 

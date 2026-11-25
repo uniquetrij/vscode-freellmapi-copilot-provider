@@ -27,6 +27,7 @@ Press F5 for an Extension Development Host. Packaging requires Node >= 22 (VS Co
 - `src/modelRegistry.ts` — TTL cache, ETag revalidation, change events, last-known-good fallback.
 - `src/catalogClient.ts` — catalog HTTP fetch shared by the registry and commands.
 - `src/serverManager.ts` — gateway probe/start/stop and process-tree termination.
+- `src/gatewayDiscovery.ts`, `src/desktopKey.ts` — desktop app port discovery and loopback-only unified-key import (`/api/auth/desktop-session` → `/api/settings/api-key`).
 - `src/config.ts`, `src/urls.ts` — settings and URL normalization.
 - `src/errors.ts`, `src/diagnostics.ts` — actionable HTTP errors, redaction, serialization.
 - `src/secrets.ts`, `src/output.ts`, `src/buildInfo.ts`, `src/runtimeMode.ts` — storage, channels, build stamp, constants.
@@ -34,7 +35,7 @@ Press F5 for an Extension Development Host. Packaging requires Node >= 22 (VS Co
 
 ## Conventions
 
-- Keep `modelCatalog.ts`, `urls.ts`, and the error helpers free of `vscode` value imports so they stay unit-testable.
+- Keep `modelCatalog.ts`, `urls.ts`, `gatewayDiscovery.ts`, `desktopKey.ts`, and the error helpers free of `vscode` value imports so they stay unit-testable.
 - Do not log API keys. Use `redactHeaders` / `redactHeaderRecord`; debug request bodies still contain prompts.
 - Preserve tool-call/tool-result pairs when changing truncation.
 - The gateway is shared: do not auto-kill a managed server on deactivation.
