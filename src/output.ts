@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
+import { DEV_BADGE, isDevelopmentMode } from './runtimeMode';
 
 let outputChannel: vscode.LogOutputChannel | undefined;
 let serverChannel: vscode.OutputChannel | undefined;
 
 export function getOutputChannel(): vscode.LogOutputChannel {
 	if (!outputChannel) {
-		outputChannel = vscode.window.createOutputChannel('FreeLLMAPI', { log: true });
+		const badge = isDevelopmentMode() ? DEV_BADGE : '';
+		outputChannel = vscode.window.createOutputChannel(`${badge}FreeLLMAPI`, { log: true });
 	}
 	return outputChannel;
 }

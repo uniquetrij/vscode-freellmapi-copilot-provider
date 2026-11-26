@@ -1,4 +1,5 @@
 import { extractErrorDetails } from './diagnostics';
+import { getSettingName } from './runtimeMode';
 
 const CONNECTION_CODES = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EHOSTUNREACH', 'ENETUNREACH', 'EAI_AGAIN']);
 
@@ -37,7 +38,7 @@ export function truncateForMessage(value: string, max = 600): string {
 export function formatUnreachable(baseUrl: string, err?: unknown): string {
 	const details = err ? extractErrorDetails(err) : {};
 	const target = details.url ?? baseUrl;
-	return `FreeLLMAPI is not reachable at ${target}. Run "FreeLLMAPI: Start Server", start the gateway yourself, or change "freellmapi.baseUrl" if it runs elsewhere.`;
+	return `FreeLLMAPI is not reachable at ${target}. Run "FreeLLMAPI: Start Server", start the gateway yourself, or change "${getSettingName('baseUrl')}" if it runs elsewhere.`;
 }
 
 export function formatHttpError(
@@ -52,7 +53,7 @@ export function formatHttpError(
 		case 403:
 			return `FreeLLMAPI refused the request (HTTP 403) at ${url}. Inference accepts the unified key or a client-profile key; the usage endpoint only accepts the unified key.${suffix}`;
 		case 404:
-			return `FreeLLMAPI returned HTTP 404 for ${url}. Check that "freellmapi.baseUrl" includes the version path (usually http://127.0.0.1:3001/v1) and that the selected model exists.${suffix}`;
+			return `FreeLLMAPI returned HTTP 404 for ${url}. Check that "${getSettingName('baseUrl')}" includes the version path (usually http://127.0.0.1:3001/v1) and that the selected model exists.${suffix}`;
 		case 422:
 			return `FreeLLMAPI could not satisfy the request (HTTP 422).${suffix}`;
 		case 429:

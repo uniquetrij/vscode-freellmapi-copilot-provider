@@ -37,7 +37,6 @@
   "icon": "assets/icon.png",
   "main": "./build/out/extension.js",
   "activationEvents": [
-    "*",
     "onStartupFinished",
     "onLanguageModelChatProvider:freellmapi",
     "onCommand:freellmapi.setApiKey",
@@ -249,6 +248,10 @@
     "package": "node ./scripts/build_install/build-vsix.js",
     "package:marketplace": "node ./scripts/build_install/build-vsix.js --marketplace",
     "install-vsix": "node ./scripts/build_install/install-vsix.js",
+    "dev:host": "node ./scripts/dev_host/isolated-host.js start",
+    "dev:host:stop": "node ./scripts/dev_host/isolated-host.js stop",
+    "dev:host:status": "node ./scripts/dev_host/isolated-host.js status",
+    "dev:host:logs": "node ./scripts/dev_host/isolated-host.js logs",
     "version:bump": "node ./scripts/version-bump.js",
     "release": "npm run version:bump && npm run package",
     "publish:marketplace": "node ./scripts/build_install/publish-vsix.js"

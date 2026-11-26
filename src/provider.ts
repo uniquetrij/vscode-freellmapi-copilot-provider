@@ -11,6 +11,7 @@ import {
 } from './freellmapiClient';
 import { ModelRegistry } from './modelRegistry';
 import { getOutputChannel } from './output';
+import { DEV_BADGE, getSettingName, isDevelopmentMode } from './runtimeMode';
 import { getApiKey } from './secrets';
 import { ReasoningCache } from './reasoningCache';
 import {
@@ -79,18 +80,19 @@ export class FreeLlmApiChatProvider implements vscode.LanguageModelChatProvider 
 		// VS Code pulls this list while the window restores and keeps the answer
 		// for the chat session it is starting, so a known list is returned
 		// without waiting for the gateway and revalidated in the background.
+		const badge = isDevelopmentMode() ? DEV_BADGE : '';
 		const known = this.registry.getCachedModels();
 		if (known.length > 0) {
 			void this.registry.getModels().catch(() => undefined);
 			this.logResolve(known.length);
-			return known;
+			return badgeModelNames(known, badge);
 		}
 
 		return this.registry
 			.getModels()
 			.then((models) => {
 				this.logResolve(models.length);
-				return models;
+				return badgeModelNames(models, badge);
 			})
 			.catch((err) => {
 				output.error(
@@ -174,7 +176,7 @@ export class FreeLlmApiChatProvider implements vscode.LanguageModelChatProvider 
 		if (dropped.images > 0) {
 			output.warn(
 				`Dropped ${dropped.images} image part(s) because image input is disabled for ${model.id} ` +
-				'(see "freellmapi.imageInput").'
+				'(see "' + getSettingName('imageInput') + '").'
 			);
 		}
 		if (dropped.parts > 0) {
@@ -198,10 +200,11 @@ export class FreeLlmApiChatProvider implements vscode.LanguageModelChatProvider 
 		}
 
 		let lastReasoning = '';
+		const prefixDelta = createDevBadgeEmitter(devResponseBadge());
 		const reportThinking = createThinkingReporter({
 			api: vscode,
 			report: (part) => progress.report(part as vscode.LanguageModelResponsePart2),
-			fallback: (text) => progress.report(new vscode.LanguageModelTextPart(text)),
+			fallback: (text) => progress.report(new vscode.LanguageModelTextPart(prefixDelta(text))),
 			onUnavailable: (reason) => {
 				if (!thinkingFallbackLogged) {
 					thinkingFallbackLogged = true;
@@ -231,7 +234,7 @@ export class FreeLlmApiChatProvider implements vscode.LanguageModelChatProvider 
 				{
 					onTextDelta: (delta) => {
 						if (delta) {
-							progress.report(new vscode.LanguageModelTextPart(delta));
+							progress.report(new vscode.LanguageModelTextPart(prefixDelta(delta)));
 						}
 					},
 					onThinkingDelta: (delta) => {
@@ -304,6 +307,11 @@ function createClientLogger(output: vscode.LogOutputChannel): ClientLogger {
 	};
 }
 
+/** The badge a debug window puts on its own replies; empty in a release window. */
+function devResponseBadge(): string {
+	return isDevelopmentMode() ? DEV_BADGE : '';
+}
+
 function resolveSession(
 	messages: readonly vscode.LanguageModelChatRequestMessage[]
 ): { id: string; cacheKey?: string } {
@@ -370,6 +378,7 @@ function mapVsCodeMessageToAiSdkMessages(
 	dropped: { images: number; parts: number }
 ): ModelMessage[] {
 	const isUser = message.role === vscode.LanguageModelChatMessageRole.User;
+	const historyBadge = isUser ? '' : devResponseBadge();
 
 	const userParts: any[] = [];
 	const toolResultParts: any[] = [];
@@ -378,7 +387,8 @@ function mapVsCodeMessageToAiSdkMessages(
 
 	for (const part of message.content) {
 		if (part instanceof vscode.LanguageModelTextPart) {
-			const textPart = { type: 'text', text: part.value };
+			const text = historyBadge ? stripDevBadge(part.value, historyBadge) : part.value;
+			const textPart = { type: 'text', text };
 			if (isUser) {
 				userParts.push(textPart);
 			} else {
@@ -478,7 +488,7 @@ function mapVsCodeMessageToAiSdkMessages(
 	return out;
 }
 
-function applyReasoningFallback(messages: ModelMessage[], reasoning: string): ModelMessage[] {
+export function applyReasoningFallback(messages: ModelMessage[], reasoning: string): ModelMessage[] {
 	if (!reasoning || messages.length === 0) {
 		return messages;
 	}
@@ -633,7 +643,7 @@ async function toolsToAiSdkTools(
 	return mapped;
 }
 
-function normalizeToolSchema(schema: unknown): unknown {
+export function normalizeToolSchema(schema: unknown): unknown {
 	const fallback = { type: 'object', properties: {}, additionalProperties: true };
 	if (!schema || typeof schema !== 'object') {
 		return fallback;
@@ -652,7 +662,7 @@ function normalizeToolSchema(schema: unknown): unknown {
 	return record;
 }
 
-function buildToolNameMap(
+export function buildToolNameMap(
 	tools: readonly vscode.LanguageModelChatTool[] | undefined
 ): { toProvider: Map<string, string>; toVsCode: Map<string, string> } {
 	const toProvider = new Map<string, string>();
@@ -677,13 +687,52 @@ function buildToolNameMap(
 	return { toProvider, toVsCode };
 }
 
-function sanitizeToolName(name: string): string {
+export function sanitizeToolName(name: string): string {
 	const cleaned = name.replace(/[^a-zA-Z0-9_-]/g, '_');
 	return cleaned.length > 0 ? cleaned.slice(0, 128) : 'tool';
 }
 
-function mapToolName(name: string, toolNameMap: ReadonlyMap<string, string>): string {
+export function mapToolName(name: string, toolNameMap: ReadonlyMap<string, string>): string {
 	return toolNameMap.get(name) ?? name;
+}
+
+/**
+ * Labels the picker entries of a debug window so they cannot be mistaken for
+ * the release provider's models when both are loaded. Applied on the way out
+ * instead of in the catalog mapping, because that result is persisted and the
+ * stored copy has to stay identity-free.
+ */
+export function badgeModelNames(
+	models: readonly vscode.LanguageModelChatInformation[],
+	badge: string
+): vscode.LanguageModelChatInformation[] {
+	return badge ? models.map((model) => ({ ...model, name: `${badge}${model.name}` })) : models.slice();
+}
+
+/**
+ * Prefixes the first visible text of a response in a debug window, so a reply
+ * produced by the debug provider is recognizable in the transcript. The badge
+ * is consumed by the first non-empty chunk: an empty delta must not swallow it,
+ * and a response that only calls tools has nothing to mark.
+ */
+export function createDevBadgeEmitter(badge: string): (delta: string) => string {
+	let pending = badge.length > 0;
+	return (delta) => {
+		if (!pending || !delta) {
+			return delta;
+		}
+		pending = false;
+		return `${badge}${delta}`;
+	};
+}
+
+/**
+ * Removes the badge the debug window added to its own reply before that reply
+ * goes back to the gateway as history, so the model never sees the marker and
+ * cannot echo it into the next answer.
+ */
+export function stripDevBadge(text: string, badge: string): string {
+	return badge && text.startsWith(badge) ? text.slice(badge.length) : text;
 }
 
 // ---------------------------------------------------------------------------
@@ -691,7 +740,7 @@ function mapToolName(name: string, toolNameMap: ReadonlyMap<string, string>): st
 // ---------------------------------------------------------------------------
 
 /** Estimate token count for a single AI SDK message (rough: ~4 chars/token). */
-function estimateMessageTokens(message: any): number {
+export function estimateMessageTokens(message: any): number {
 	try {
 		return Math.max(1, Math.ceil(JSON.stringify(message).length / 4));
 	} catch {
@@ -699,7 +748,7 @@ function estimateMessageTokens(message: any): number {
 	}
 }
 
-function estimateTotalTokens(messages: any[]): number {
+export function estimateTotalTokens(messages: any[]): number {
 	let total = 0;
 	for (const message of messages) {
 		total += estimateMessageTokens(message);
@@ -716,7 +765,7 @@ function estimateTotalTokens(messages: any[]): number {
  *     to respond to.
  *  4. Never break a tool-call / tool-result pair.
  */
-function truncateMessages(
+export function truncateMessages(
 	messages: any[],
 	budgetTokens: number
 ): { messages: any[]; dropped: number } {
@@ -755,7 +804,7 @@ function truncateMessages(
 	};
 }
 
-function truncateNonSystemMessages(messages: any[], budgetTokens: number): any[] {
+export function truncateNonSystemMessages(messages: any[], budgetTokens: number): any[] {
 	if (messages.length === 0) {
 		return [];
 	}

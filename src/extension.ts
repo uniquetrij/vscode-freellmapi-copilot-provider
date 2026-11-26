@@ -9,15 +9,19 @@ import { formatHttpError, formatUnreachable } from './errors';
 import { createNodeDiscoveryHost, discoverLoopbackGateway, type DiscoveredGateway } from './gatewayDiscovery';
 import { getOutputChannel, getServerOutputChannel } from './output';
 import { FreeLlmApiChatProvider } from './provider';
-import { CONFIGURATION_NAMESPACE, VENDOR_ID } from './runtimeMode';
+import { getRuntimeIdentity, getSettingName, getVendorId, initializeRuntimeMode } from './runtimeMode';
 import { clearApiKey, getApiKey, setApiKey } from './secrets';
 import { ServerManager, type ServerHealth } from './serverManager';
 import { resolveThinkingPartConstructor } from './thinkingParts';
 import { dashboardUrl, normalizeBaseUrl, originFromBaseUrl, usageUrl } from './urls';
 
-const CONFIG = CONFIGURATION_NAMESPACE;
+// Resolved from the loaded manifest in activate(); the disk copy is a safe
+// early value because every use runs after activation.
+let CONFIG = getRuntimeIdentity().commandNamespace;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+	initializeRuntimeMode(context);
+	CONFIG = getRuntimeIdentity().commandNamespace;
 	const output = getOutputChannel();
 	output.info(describeBuild());
 
@@ -26,7 +30,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	context.subscriptions.push(output, provider, server);
 
 	try {
-		context.subscriptions.push(vscode.lm.registerLanguageModelChatProvider(VENDOR_ID, provider));
+		context.subscriptions.push(vscode.lm.registerLanguageModelChatProvider(getVendorId(), provider));
 	} catch (err) {
 		output.error(
 			`Could not register the FreeLLMAPI chat provider: ${err instanceof Error ? err.message : String(err)}`
@@ -108,7 +112,7 @@ async function warmModelList(
 			return;
 		}
 		if (vscode.lm?.selectChatModels) {
-			await vscode.lm.selectChatModels({ vendor: VENDOR_ID });
+			await vscode.lm.selectChatModels({ vendor: getVendorId() });
 		}
 	} catch {
 		// The provider logs catalog failures; warming must never break activation.
@@ -258,7 +262,7 @@ async function refreshModelsCommand(
 
 	if (vscode.lm?.selectChatModels) {
 		try {
-			const models = await vscode.lm.selectChatModels({ vendor: VENDOR_ID });
+			const models = await vscode.lm.selectChatModels({ vendor: getVendorId() });
 			output.info(`Model list refreshed: ${models.length} model(s) available through VS Code.`);
 			for (const model of models.slice(0, 50)) {
 				output.info(`  - ${model.name} (${model.id})`);
@@ -372,7 +376,7 @@ async function selfTestCommand(
 	}
 
 	await provider.refreshModels();
-	const availableModels = await vscode.lm.selectChatModels({ vendor: VENDOR_ID });
+	const availableModels = await vscode.lm.selectChatModels({ vendor: getVendorId() });
 	if (availableModels.length === 0) {
 		output.error('No FreeLLMAPI models are available. Set an API key and refresh the model list.');
 		const action = await vscode.window.showWarningMessage(
@@ -700,7 +704,8 @@ async function restartServerCommand(
 	const health = await server.probe();
 	if (health.reachable && !server.isManaged() && !getServerConfig().stopCommand) {
 		void vscode.window.showWarningMessage(
-			'FreeLLMAPI is running but was not started by this extension. Configure "freellmapi.server.stopCommand" to let Restart stop it.',
+			'FreeLLMAPI is running but was not started by this extension. Configure "' +
+			`${getSettingName('server.stopCommand')}" to let Restart stop it.`,
 			'Open Settings'
 		).then((action) => {
 			if (action === 'Open Settings') {
@@ -1048,7 +1053,7 @@ async function autoStartServer(
 		return;
 	}
 
-	output.info('"freellmapi.server.autoStart" is enabled; starting FreeLLMAPI.');
+	output.info(`"${getSettingName('server.autoStart')}" is enabled; starting FreeLLMAPI.`);
 	try {
 		const result = await server.start();
 		output.info(result.message);

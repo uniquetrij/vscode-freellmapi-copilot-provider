@@ -241,6 +241,10 @@ const marketplaceBuild = process.argv.slice(2).includes('--marketplace');
 
 assertSupportedNode();
 
+// A manifest marked for a side-by-side debug session must never be packaged.
+console.log('=== Ensuring release manifest is unmarked ===');
+run(process.execPath, [path.join(ROOT, 'scripts', 'dev-marker.js'), 'unmark']);
+
 fs.mkdirSync(BUILD_DIR, { recursive: true });
 fs.rmSync(BUILD_INFO_FILE, { force: true });
 

@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { getConfig, getServerConfig } from './config';
 import { getOutputChannel, getServerOutputChannel } from './output';
+import { getSettingName } from './runtimeMode';
 import { getApiKey } from './secrets';
 import { modelsUrl, originFromBaseUrl, pingUrl } from './urls';
 
@@ -237,7 +238,7 @@ export class ServerManager {
 		throw new Error(
 			`FreeLLMAPI did not answer at ${target} within ${Math.round(timeoutMs / 1000)}s.\n\n` +
 			`${this.getTail(30) || '(no output)'}\n\n` +
-			'Configure "freellmapi.server.path" or "freellmapi.server.startCommand" if auto-detection picked the wrong checkout.'
+			`Configure "${getSettingName('server.path')}" or "${getSettingName('server.startCommand')}" if auto-detection picked the wrong checkout.`
 		);
 	}
 
@@ -267,7 +268,7 @@ export class ServerManager {
 		if (!stopped) {
 			return {
 				stopped: false,
-				message: 'FreeLLMAPI was not started by this extension. Start it with "FreeLLMAPI: Start Server" or configure "freellmapi.server.stopCommand".',
+				message: `FreeLLMAPI was not started by this extension. Start it with "FreeLLMAPI: Start Server" or configure "${getSettingName('server.stopCommand')}".`,
 			};
 		}
 
@@ -386,7 +387,7 @@ function resolveStartCommand(): ResolvedStart {
 	if (candidates.length === 0) {
 		throw new Error(
 			`Could not find a FreeLLMAPI checkout to start in ${root}.\n\n` +
-			'Set "freellmapi.server.path" to the checkout, or set "freellmapi.server.startCommand" ' +
+			`Set "${getSettingName('server.path')}" to the checkout, or set "${getSettingName('server.startCommand')}" ` +
 			'to the command that starts your gateway (for example "docker compose up -d").'
 		);
 	}

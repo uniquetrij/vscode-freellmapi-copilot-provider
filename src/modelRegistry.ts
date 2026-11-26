@@ -6,6 +6,7 @@ import { wrapApiError } from './errors';
 import { catalogSignature, catalogToChatInformation } from './modelCatalog';
 import { getOutputChannel } from './output';
 import { getApiKey } from './secrets';
+import { getSettingName } from './runtimeMode';
 import { dashboardUrl, modelsUrl } from './urls';
 
 const MODEL_REVALIDATE_MIN_INTERVAL_MS = 30 * 60_000;
@@ -206,7 +207,7 @@ export class ModelRegistry {
 			output.info(
 				`Loaded ${models.length} model(s) from ${url} (${available} currently usable${
 					!config.showUnavailableModels && hidden > 0
-						? `; ${hidden} unavailable hidden by "freellmapi.showUnavailableModels"`
+						? `; ${hidden} unavailable hidden by "${getSettingName('showUnavailableModels')}"`
 						: ''
 				}).`
 			);

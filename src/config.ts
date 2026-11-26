@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { ImageInputMode } from './modelCatalog';
-import { CONFIGURATION_NAMESPACE } from './runtimeMode';
+import { getRuntimeIdentity } from './runtimeMode';
 import { DEFAULT_BASE_URL, normalizeBaseUrl } from './urls';
 
 export interface FreeLlmApiConfig {
@@ -26,7 +26,7 @@ export interface FreeLlmApiServerConfig {
 }
 
 function configuration(): vscode.WorkspaceConfiguration {
-	return vscode.workspace.getConfiguration(CONFIGURATION_NAMESPACE);
+	return vscode.workspace.getConfiguration(getRuntimeIdentity().configurationNamespace);
 }
 
 let baseUrlOverride: string | undefined;

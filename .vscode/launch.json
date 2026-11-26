@@ -2,19 +2,43 @@
   "version": "0.2.0",
   "configurations": [
     {
+      // Attaches to the extension host of the isolated instance that
+      // `Dev Host: Start` spawns with its own --user-data-dir, so it has its
+      // own agent host and chat model picker. That task also waits for the
+      // inspector on 9229, so there is always something to attach to.
       "name": "Run Extension",
+      "type": "pwa-node",
+      "request": "attach",
+      "port": 9229,
+      "preLaunchTask": "Dev Host: Start",
+      "postDebugTask": "Dev Host: Stop",
+      "outFiles": [
+        "${workspaceFolder}/build/out/**/*.js"
+      ]
+    },
+    {
+      // In-window Extension Development Host: no separate profile, so its chat
+      // picker cannot list the dev models, but it debugs the extension host in
+      // this window. Both proposed-api ids are listed because the launch
+      // arguments are resolved before `Debug Prepare` marks the manifest, and a
+      // stable build grants proposals only to an id it names.
+      "name": "Run Extension (In-Window EDH)",
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
       "args": [
-        "--disable-extensions",
-        "--enable-proposed-api=uniquetrij.freellmapi-chat-provider",
-        "--extensionDevelopmentPath=${workspaceFolder}"
+        // Deliberately no --disable-extensions: this window loads both copies.
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--enable-proposed-api",
+        "uniquetrij.freellmapi-chat-provider",
+        "--enable-proposed-api",
+        "uniquetrij-dev.freellmapi-chat-provider-dev"
       ],
       "outFiles": [
         "${workspaceFolder}/build/out/**/*.js"
       ],
-      "preLaunchTask": "TypeScript Compile"
+      "preLaunchTask": "Debug Prepare",
+      "postDebugTask": "Dev Marker: Unmark"
     }
   ]
 }

@@ -195,13 +195,19 @@ npm install
 npm run compile              # tsc -> build/out
 npm run watch                # incremental compile
 npm run lint
-npm test                     # compile + node:test (URLs, catalog, client, reasoning parts)
+npm test                     # compile + node:test (URLs, catalog, client, provider helpers, reasoning parts)
 npm run package              # build/<name>-<version>+<build>.vsix           (full)
 npm run package:marketplace  # build/<name>-<version>+<build>-marketplace.vsix (gallery-safe)
 npm run install-vsix         # installs the newest full VSIX
+npm run dev:host             # starts the isolated debug instance directly
+npm run dev:host:stop        # stops it and unmarks the manifest
+npm run dev:host:status
+npm run dev:host:logs        # tails its agent-host log
 ```
 
-Press <kbd>F5</kbd> to launch an Extension Development Host. Debug builds are marked and reported in the log; packaging stamps `build/out/buildInfo.json` and a `+<build>` version suffix without changing the committed version.
+Press <kbd>F5</kbd> to attach to an isolated Extension Development Host: `Dev Host: Start` marks `package.json` with side-by-side `-dev` ids, compiles, and launches a separate VS Code instance with its own profile (`%LOCALAPPDATA%\freellmapi-dev-host`) so its agent host — and therefore its chat model picker — is independent of this window. Stopping the debug session closes that instance and unmarks the manifest; `npm run package` also unmarks before reading it. **Run Extension (In-Window EDH)** opens a normal in-window host instead, which shares this window's agent host and cannot list the dev models.
+
+Debug builds are marked in the output channel name, in every model label of the chat picker, and at the start of each reply (`🐞 `), so a picker or transcript holding both providers stays readable; the persisted catalog keeps the plain labels and the badge is stripped from the history sent back to the gateway. Building is reported in the log, and packaging stamps `build/out/buildInfo.json` and a `+<build>` version suffix without changing the committed version.
 
 Two artifacts come from the same sources:
 
@@ -212,7 +218,7 @@ Two artifacts come from the same sources:
 
 `install-vsix` prefers the full build by default; pass `--marketplace` to install the gallery variant and confirm that reasoning falls back.
 
-If the development host opens and closes after about a second, check the Run and Debug view for a session that is still marked active (the floating debug toolbar stays visible with no host window). VS Code closes the new host as soon as that stale session terminates, so press <kbd>Ctrl</kbd>+<kbd>F2</kbd> (Stop) in the main window, close any leftover `[Extension Development Host]` windows, and press <kbd>F5</kbd> again. The `Extension Development Host` window created by a working launch is attached to the debug session; stopping the session closes it.
+If the isolated development host opens and closes after about a second, check the Run and Debug view for a session that is still marked active (the floating debug toolbar stays visible with no host window). VS Code closes the new host as soon as that stale session terminates, so press <kbd>Ctrl</kbd>+<kbd>F2</kbd> (Stop) in the main window, close any leftover windows, and press <kbd>F5</kbd> again. If the attach fails with "connection refused", the inspector on port 9229 never opened — run `npm run dev:host:status` and `npm run dev:host:stop`, then retry.
 
 The source is split into small modules:
 
@@ -222,6 +228,7 @@ The source is split into small modules:
 - `modelCatalog.ts` / `modelRegistry.ts` / `catalogClient.ts` — catalog parsing, caching, ETag revalidation.
 - `serverManager.ts` — gateway process lifecycle.
 - `gatewayDiscovery.ts`, `desktopKey.ts` — desktop app port and unified-key discovery (loopback only).
+- `runtimeMode.ts` — manifest-derived vendor/command/configuration ids (release vs `-dev`).
 - `config.ts`, `urls.ts`, `errors.ts`, `diagnostics.ts`, `secrets.ts`, `output.ts` — settings, normalization, errors, redaction, storage, logging.
 - `thinkingParts.ts` — resolves `LanguageModelThinkingPart` at runtime and degrades reasoning to text when the proposal is unavailable.
 

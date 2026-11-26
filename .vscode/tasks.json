@@ -2,6 +2,34 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Dev Marker: Mark",
+      "type": "shell",
+      "command": "node scripts/dev-marker.js mark"
+    },
+    {
+      "label": "Dev Marker: Unmark",
+      "type": "shell",
+      "command": "node scripts/dev-marker.js unmark"
+    },
+    {
+      "label": "Dev Host: Start",
+      "type": "shell",
+      "command": "node scripts/dev_host/isolated-host.js start --inspect"
+    },
+    {
+      "label": "Dev Host: Stop",
+      "type": "shell",
+      "command": "node scripts/dev_host/isolated-host.js stop"
+    },
+    {
+      "label": "Debug Prepare",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Dev Marker: Mark",
+        "TypeScript Compile"
+      ]
+    },
+    {
       "type": "npm",
       "script": "compile",
       "problemMatcher": "$tsc",
